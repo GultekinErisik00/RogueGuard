@@ -10,3 +10,6 @@ inventory.yaml
 experiments/results.csv
 .DS_Store
 data/*.log
+.obsidian/workspace*
+.obsidian/cache
+.trash/
