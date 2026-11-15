@@ -1,4 +1,8 @@
-# RogueGuard — Ajan Talimatları
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## RogueGuard — Ajan Talimatları
 
 Bu repo, Siber Güvenlik dersi dönem projesi **RogueGuard: Rogue IoT Device Detection and Containment** içindir. Araç, izole bir lab ağındaki IoT cihazlarını keşfeder, parmak izi çıkarır, öğrenilmiş envanterle karşılaştırır ve sahte ya da taklitçi cihazları otomatik olarak karantinaya alır.
 
@@ -20,9 +24,29 @@ ssh -t rogue 'tmux new -As rg'    # uzun işler (deneyler, learn modu) için kal
 
 - `rogue` Mac'teki `~/.ssh/config` içindeki bir takma ad: kullanıcı `rogue`, anahtar `~/.ssh/rogueguard`. IP'yi elle yazma, hep `ssh rogue` kullan.
 - **İlk iş bağlantıyı doğrula:** `ssh rogue 'hostname && whoami && sudo -n true && echo SUDO_OK'`. `rogueguard-lab`, `rogue` ve `SUDO_OK` görmelisin. Bağlanamıyorsan ya da `SUDO_OK` gelmiyorsa dur ve kullanıcıya sor; VM kapalı olabilir veya IP'si değişmiş olabilir.
-- Dosya kopyalama: `rsync -a --exclude .venv --exclude .git ./ rogue:~/rogueguard/` ya da `scp <dosya> rogue:<yol>`.
+- Dosya kopyalama: `rsync -a --exclude .venv --exclude .git --exclude .obsidian --exclude data ./ rogue:~/rogueguard/` ya da `scp <dosya> rogue:<yol>`. **`data/` mutlaka hariç tutulur**: VM'deki canlı SQLite DB'yi (öğrenilmiş envanter) ezmesin.
 - Container içinde komut: `ssh rogue 'incus exec <container> -- <komut>'`.
 - Mac'te sadece kod yazılır ve git işlemleri yapılır. Mac'e Incus, scapy daemon'u ya da lab bileşeni kurma.
+
+### Sık kullanılan komutlar (hepsi VM'de, `~/rogueguard` içinde)
+
+```bash
+# Testler (çıplak `pytest` kullanma: rogueguard paketini bulamaz)
+ssh rogue 'cd ~/rogueguard && .venv/bin/python -m pytest -q'
+ssh rogue 'cd ~/rogueguard && .venv/bin/python -m pytest -q tests/test_decision.py::test_adı'   # tek test
+
+# Modlar (ham soket gerektiği için root)
+sudo .venv/bin/python -m rogueguard discover --duration 150   # sadece keşif
+sudo .venv/bin/python -m rogueguard learn --duration 660      # envanter + rg_approved
+sudo .venv/bin/python -m rogueguard protect                   # keşif + karar motoru
+sudo .venv/bin/python -m rogueguard sync                      # router setlerini DB'den doldur
+```
+
+- VM'de `sqlite3` CLI yok; DB'ye `.venv/bin/python -c` ile `sqlite3` modülü üzerinden bak (`data/rogueguard.db`).
+- **Çalışma döngüsü:** Mac'te düzenle → `rsync` → VM'de test. Mac'te venv/scapy yok, `pytest` Mac'te çalışmaz.
+- **`learn` penceresinde görülen her MAC onaylanır.** O sırada lab'da rogue container açıksa envantere girer; deneylerde `learn`'i sadece `clean` snapshot'lar ve rogue'suz lab ile çalıştır.
+- `inventory.yaml` sadece VM'de üretilir (gitignore'da); canlı benzerlik testi (`test_learned_inventory_*`) başka yerde skip olur. Benzerlik tablosunu yeniden üretmek: `.venv/bin/python -m experiments.similarity_table` (çıktı `notes/Benzerlik Tablosu.md`'ye).
+- Repoda pytest/ruff/requirements dosyası yok; bağımlılıklar `.venv` içinde elle kurulu (Python 3.14, pip'i paket paket kur, hepsini tek seferde kurmak takılıyor).
 
 ---
 
@@ -31,7 +55,7 @@ ssh -t rogue 'tmux new -As rg'    # uzun işler (deneyler, learn modu) için kal
 1. **Sadece lab içinde çalış.** Tarama, dinleme, ARP spoofing ve engelleme yalnızca VM içindeki `br-iot`, `br-quar`, `br-svc` köprülerinde yapılır. Mac'in ağına, Fusion NAT ağına (`enp2s0`) veya internete asla tarama/saldırı trafiği gönderme.
 2. **Her adımın "Kontrol" maddesi geçmeden sonrakine geçme.** Geçmezse hatayı düzelt ya da durup kullanıcıya hata çıktısıyla birlikte sor.
 3. **VM host'una Docker, LXD veya snap paketleri kurma.** Docker sadece `wazuh` Incus container'ının içinde çalışır.
-4. **Host'ta `nft flush ruleset` çalıştırma.** Incus'un kendi kurallarını siler. Host'ta sadece `inet rg_host` tablosuna dokun.
+4. **Host'ta `nft flush ruleset` çalıştırma.** Incus'un kendi kurallarını siler. Host'ta sadece `inet rg_host` tablosuna dokun. **`systemctl restart|stop nftables` da dolaylı olarak flush eder** (Ubuntu unit'indeki `ExecStop`). Bunu `lab/host/nftables-override.conf` (`/etc/systemd/system/nftables.service.d/override.conf`) engelliyor; o dosya kurulu değilse nftables'ı yeniden başlatma. Yanlışlıkla silinirse `systemctl restart incus` Incus kurallarını geri getirir.
 5. **Gizli bilgileri commit'leme.** Groq API anahtarı vb. sadece `.env` içinde durur; `.env` `.gitignore`'da olmalı. Sohbete veya log'a yazma.
 6. **Geri alınamaz işlemlerden önce sor:** VM'i silmek, snapshot geri yüklemek, disk/LVM değişikliği (Adım 1'deki `lvextend` hariç), kullanıcı hesabı değişikliği.
 7. **Kod okunabilir olmalı.** Kullanıcı kodu hocaya savunacak. Her modülün başına 2–3 satırlık amaç yorumu yaz; karmaşık kararları commit mesajında açıkla. Gereksiz soyutlama yapma.
@@ -52,7 +76,7 @@ ssh -t rogue 'tmux new -As rg'    # uzun işler (deneyler, learn modu) için kal
 | VM ağ arayüzü | `enp2s0` (DHCP, Fusion NAT) |
 
 - Mac'teki bir ajan VM'de komutu `ssh rogue '<komut>'` ile çalıştırır. Uzun işler için `ssh rogue` içinde `tmux` kullan.
-- Kod Mac'teki bu repoda yazılır; VM'e `rsync -a --exclude .venv --exclude .git ./ rogue:~/rogueguard/` ile senkronlanır (ya da GitHub üzerinden `git pull`).
+- Kod Mac'teki bu repoda yazılır; VM'e yukarıdaki `rsync` komutuyla senkronlanır (ya da GitHub üzerinden `git pull`).
 - Apple Silicon kısıtı: OPNsense ve x86 OVA'lar çalışmaz. Bu yüzden firewall **nftables + dnsmasq çalıştıran `rg-router` container'ıdır**, Wazuh **Docker ile container içindedir**.
 - Ubuntu 26.10 kullanılıyor (rehberde 24.04 yazar). Bir paket adı bulunamazsa `apt search` ile karşılığını bul, `PROGRESS.md`'ye not düş.
 
@@ -149,7 +173,7 @@ Tüm profiller `lab/devices.yaml` içinde durur; bu dosya aynı zamanda doğru c
 
 ## 7. Yapılacaklar (sırayla)
 
-Durum işaretleri: `[x]` bitti, `[ ]` yapılacak, `[?]` kullanıcı yapmış olabilir, kontrol et.
+Durum işaretleri: `[x]` bitti, `[~]` kısmen (ayrıntı `PROGRESS.md`'de), `[ ]` yapılacak, `[?]` kullanıcı yapmış olabilir, kontrol et.
 
 ### Adım 1 — VM temel ayarları
 - [x] Ubuntu 26.10 arm64 kuruldu, hostname `rogueguard-lab`, kullanıcı `rogue`
@@ -189,10 +213,10 @@ Durum işaretleri: `[x]` bitti, `[ ]` yapılacak, `[?]` kullanıcı yapmış ola
 - Daemon root/`CAP_NET_RAW,CAP_NET_ADMIN` ile çalışır (systemd unit'te `AmbientCapabilities`).
 
 ### Adım 6 — Modüller (her biri "Bitti" koşuluyla)
-- **6.1 Keşif:** periyodik `srp` ARP taraması (`iface=br-iot`); tek `sniff` ile ARP, DHCP (option 12/55/60/61), mDNS (5353); trafik örneği (MAC başına hedef ip:port, yayın aralığı). Olaylar: `new_device`, `changed_device`. *Bitti:* 6 cihaz `observations` tablosunda ARP+DHCP+mDNS ile.
-- **6.2 Öğrenme modu:** `python -m rogueguard learn --duration <SN>`; cihaz başına bir kez `nmap -sT -sV -oX -`; sonunda `devices` (approved), `inventory.yaml`, `rg_approved` doldurulur. pytest: meşru cihazların ikili parmak izi benzerliği `< ESIK` (cam-01/cam-02 açıkça istisna). *Bitti:* envanterde 6 cihaz, test geçiyor.
-- **6.3 Karar motoru:** özellik bazında skor (OUI, hostname, option 55 sırası, vendor class birebir; port/mDNS/hedef Jaccard; yayın aralığı toleransla). Ağırlık/eşikler `config.yaml`'da. `detection_profile`: `allowlist` | `fingerprint` | `full`. Yanlış pozitif önlemleri: DHCP ACK'te IP→MAC güncelle, restart sonrası bekleme süresi, `abnormal_behavior` için K ardışık pencere. *Bitti:* bilinmeyen container → `unknown_device` alarmı ve `pending`. **← 19 Kasım hedefi**
-- **6.4 Karantina:** `containment/router.py` (`incus exec rg-router -- nft add/delete element inet rg <set> { ip }`, `sync()`), `containment/quarantine.py` (`incus list --format json` → `expanded_devices.eth0.hwaddr` ile MAC eşle → `incus config device set <ad> eth0 parent=br-quar`). Aynı MAC'li iki container varsa envanterle uyuşmayanı seç. `alerts.detected_at` / `contained_at` yaz.
+- [x] **6.1 Keşif:** periyodik `srp` ARP taraması (`iface=br-iot`); tek `sniff` ile ARP, DHCP (option 12/55/60/61), mDNS (5353); trafik örneği (MAC başına hedef ip:port, yayın aralığı). Olaylar: `new_device`, `changed_device`. *Bitti:* 6 cihaz `observations` tablosunda ARP+DHCP+mDNS ile.
+- [x] **6.2 Öğrenme modu:** `python -m rogueguard learn --duration <SN>`; cihaz başına bir kez `nmap -sT -sV -oX -`; sonunda `devices` (approved), `inventory.yaml`, `rg_approved` doldurulur. pytest: meşru cihazların ikili parmak izi benzerliği `< ESIK` (cam-01/cam-02 açıkça istisna). *Bitti:* envanterde 6 cihaz, test geçiyor.
+- [~] **6.3 Karar motoru:** özellik bazında skor (OUI, hostname, option 55 sırası, vendor class birebir; port/mDNS/hedef Jaccard; yayın aralığı toleransla). Ağırlık/eşikler `config.yaml`'da. `detection_profile`: `allowlist` | `fingerprint` | `full`. Yanlış pozitif önlemleri: DHCP ACK'te IP→MAC güncelle, restart sonrası bekleme süresi, `abnormal_behavior` için K ardışık pencere. *Bitti:* bilinmeyen container → `unknown_device` alarmı ve `pending`. **← 19 Kasım hedefi**
+- **6.4 Karantina:** `containment/router.py` hazır (6.2'de yazıldı: `Router.add/remove/flush/sync`, IP doğrulamalı). Eksik olan `containment/quarantine.py` (`incus list --format json` → `expanded_devices.eth0.hwaddr` ile MAC eşle → `incus config device set <ad> eth0 parent=br-quar`). Aynı MAC'li iki container varsa envanterle uyuşmayanı seç. `alerts.detected_at` / `contained_at` yaz.
 - **6.5 Alarm iletimi:** `SysLogHandler(("<WAZUH_IP>", 514))`, format `'%(asctime)s rogueguard-lab rogueguard: %(message)s'`, datefmt `'%b %d %H:%M:%S'`, mesaj JSON (`type, mac, ip, severity, attack_id, action, reason`). Wazuh kapalıyken hata vermemeli.
 - **6.6 Dashboard (Streamlit):** Cihazlar, Onay bekleyenler (Onayla/Reddet → `approvals` tablosuna yazar; daemon okur), Alarmlar, Deney sonuçları. `@st.fragment(run_every="5s")`. Mac'ten `http://<VM_IP>:8501`.
 - **6.7 Cihaz türü:** `classify/rules.py` (etiketler: camera, printer, smart_plug, sensor, thermostat, unknown); `classify/llm.py` (Groq, OpenAI uyumlu `https://api.groq.com/openai/v1`, `temperature=0`, JSON çıktı `{label, confidence, reason}`, parmak izi hash'iyle önbellek, 429'da `retry-after`). Model adını ve limitleri Groq konsolundan doğrula. **LLM çıktısı sadece dashboard'da "tahmini tür"; karar motoruna asla girmez.**
@@ -209,23 +233,21 @@ Durum işaretleri: `[x]` bitti, `[ ]` yapılacak, `[?]` kullanıcı yapmış ola
 
 ## 8. Repo yapısı
 
+Paket `rogueguard/` altında: `discovery/` (dinleme, tarama, olay üretimi), `fingerprint/` (parmak izi çıkarma ve karşılaştırma), `decision/`, `containment/`, `alerting/`, `classify/`. Lab `lab/` altında, deney betikleri `experiments/` altında, Obsidian notları (ATT&CK tablosu, benzerlik tablosu, LLM planı, rapor için zorluklar) `notes/` altında. Henüz yazılmamış modüllerin dosya adları §7'de geçer.
+
+### Kod veri akışı (birkaç dosyayı okumadan görünmez)
+
 ```
-rogueguard/
-├── CLAUDE.md  PROGRESS.md  config.yaml  .env  .gitignore
-├── rogueguard/
-│   ├── __main__.py            # learn | protect | sync
-│   ├── db.py                  # SQLite (WAL): devices, observations, alerts, approvals
-│   ├── discovery/             # arp_scan.py, sniffer.py, events.py
-│   ├── fingerprint/           # vendor.py, dhcp.py, ports.py, mdns.py, traffic.py, compare.py
-│   ├── decision/              # engine.py, arp_guard.py, attack_map.py
-│   ├── containment/           # router.py, quarantine.py
-│   ├── alerting/syslog.py
-│   └── classify/              # rules.py, llm.py
-├── dashboard/app.py
-├── lab/                       # devices.yaml, rogues.yaml, build_lab.py, agent/, router/, wazuh/
-├── experiments/               # run_scenarios.py, metrics.py, results.csv
-└── tests/
+sniffer + arp_scan + router_tap ──► Recorder (tek yazıcı thread) ──► observations (SQLite)
+                                        ├─► EventTracker ──► events (new_device / changed_device)
+                                        └─► on_observation ──► DecisionEngine ──► alerts, devices(pending)
 ```
+
+- **SQLite tek iletişim kanalı.** Daemon yazar; dashboard sadece `approvals`'a yazar, daemon okuyup uygular. SQLite bağlantısı thread'ler arası paylaşılamaz: `Recorder` kendi thread'inde bağlanır, `DecisionEngine` thread başına bağlanır (`threading.local`).
+- **Karar motoru olaylara değil gözlemlere bağlıdır.** `EventTracker` durumu bellekte tutar; daemon yeniden başlayınca klonlanmış bir MAC'in ilk DHCP paketi `changed_device` üretmez. Bu yüzden `decision/engine.py` `Recorder(on_observation=...)` kancasından beslenir.
+- **Tek profil biçimi.** `fingerprint/profile.py` aynı sözlüğü hem canlı gözlemden (`build_from_observations`) hem `lab/devices.yaml`'dan (`build_from_spec`) üretir; `engine.inventory_profile` aynısını `devices` satırından çıkarır. `fingerprint/compare.py` bunlar arasında tek skor fonksiyonudur (benzerlik testi, öğrenme ve karar motoru aynı kodu kullanır).
+- **Cihaz parmak izi alanları farklı kaynaklardan gelir:** hostname/option 55/vendor class DHCP DISCOVER/REQUEST'ten (RELEASE ve ACK eksik option taşır, parmak izine girmez); IP sadece ARP ve DHCP'den (trafik paketindeki kaynak IP router'ın yönlendirdiği paketlerde başkasınındır); yayın aralığı br-iot köprüsünden görünmediği için `rg-router` eth1'deki `tcpdump` (`router_tap.py`) ile ölçülür; portlar öğrenme modunda tek seferlik `nmap`'ten.
+- **Alarm ≠ aksiyon.** Karar motoru alarm yazar ve `alerts.action` alanına uygulanacak aksiyonu (`pending|quarantine|block`) koyar; uygulama `containment/` içindedir (6.4). Router setleri (`rg_approved`, `rg_block`) router yeniden başlayınca boşalır, `sync` DB'den yeniden kurar.
 
 Lab'ın kendisi de kod olarak tutulur: router ve host nftables dosyaları, netplan, dnsmasq ve Wazuh decoder/rule dosyaları `lab/` altında versiyonlanır ve oradan VM'e kopyalanır.
 

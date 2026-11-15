@@ -74,6 +74,14 @@
 - Bulgu: nmap, Debian cihazlarda 5355/tcp (LLMNR) açık gösterdi; port kümesi gerçek servisleri yansıtıyor.
 - **Çözüldü (yayın aralığı):** br-iot köprüsü cihaz→router unicast trafiğini host'a iletmiyordu, yayın aralığı boş kalıyordu. `discovery/router_tap.py` rg-router eth1'de `tcpdump` (BPF: MQTT PUBLISH) çalıştırıp yayınları trafik penceresine besliyor; son yayın zamanı pencereler arası tutulduğu için 300 sn'lik yazıcı da ölçülüyor. 660 sn'lik learn sonrası aralıklar: plug 10, temp 15, thermo 58, cam-01/02 ~40 (düzensiz), printer 326 sn. Meşru çiftler 0.07–0.18, cam ikizi 0.86; 15 test geçiyor.
 
+### 6.3 Karar motoru (devam ediyor — 16 Kasım)
+- `decision/attack_map.py` (§5 tablosu), `decision/engine.py`, `python -m rogueguard protect`, `config.yaml` `decision:` bölümü (`detection_profile`, `match_min: 0.9`, `alert_cooldown: 300`).
+- Motor olaylara değil **gözlemlere** bağlı (`Recorder(on_observation=...)`): `EventTracker` durumu bellekte tuttuğu için daemon yeniden başlayınca klonlanmış MAC'in ilk DHCP paketi `changed_device` üretmezdi.
+- Kurallar: envanterde olmayan MAC → `unknown_device` + `pending`; approved MAC'in DHCP parmak izi (hostname, option 55, vendor class) `compare.similarity` ile `match_min` altında → `impersonation`; DHCP ACK'te IP değişimi → sadece `devices.ip` güncellenir. `protect` başlarken `sweep()` keşifte görülmüş ama envanterde olmayan MAC'leri de işaretler. Sensörün kendi br-iot IP'si (10.20.0.2) yok sayılır.
+- 25 test geçiyor (10'u yeni, `tests/test_decision.py`). Testler `.venv/bin/python -m pytest` ile çalışır (`pytest` tek başına `rogueguard` paketini bulamıyor).
+- **Henüz yapılmadı:** `full` profilinin `abnormal_behavior` (K ardışık pencere) kısmı, restart sonrası bekleme süresi, IP değişince router `rg_approved` güncellemesi (6.4), `arp_guard.py`. `full` şimdilik `fingerprint` ile aynı.
+- **Bekleyen kontrol:** canlı R1 — rogue Fedora container'ı br-iot'a bağlanınca `unknown_device` alarmı ve `pending`; 6 meşru cihazın restart'ında 0 alarm.
+
 ### Karşılaşılan sorunlar
 - **systemd'li container'lar açılışta takılıyor (Ubuntu 26.10 host).** Debian 13 container'ında journald/networkd/resolved `(sd-mkuser...)` adımında asılı kalıyor, `eth0` IP almıyor; host dmesg'de `incus-<ad>` profili için AppArmor ptrace DENIED satırları. Neden: Ubuntu'ya özgü AppArmor kısıtı `kernel.apparmor_restrict_unprivileged_unconfined=1` (ve `..._userns=1`). Incus geliştiricisinin önerdiği çözüm bu sysctl'i 0 yapmak (lxc/incus#3251; Zabbly paketleri bunu artık otomatik yapıyor, Ubuntu'nun incus paketi yapmıyor). Host güvenlik ayarı olduğu için kullanıcı kendisi uyguladı; sonrasında sorun çözüldü.
 - Mac'teki proje klasörünün git kökü yanlışlıkla ev dizini (`/Users/gultekinqwe`) çıktı → proje klasöründe ayrı `git init` yapıldı.

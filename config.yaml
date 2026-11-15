@@ -51,5 +51,10 @@ fingerprint:
     destinations: 0.5
     interval: 0.5
 
+decision:
+  detection_profile: fingerprint   # allowlist | fingerprint | full (full şimdilik = fingerprint)
+  match_min: 0.9                   # envanterdeki kendi kaydına benzerlik bunun altındaysa impersonation
+  alert_cooldown: 300              # saniye: aynı (mac, tür) için tekrar alarm yazılmaz
+
 learn:
   inventory_path: inventory.yaml    # repo köküne göre; .gitignore'da (lab'a özel)

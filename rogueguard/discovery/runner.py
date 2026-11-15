@@ -5,7 +5,7 @@ import threading
 import time
 
 from rogueguard.discovery.arp_scan import ArpDedup, active_loop
-from rogueguard.discovery.recorder import EventHook, Recorder
+from rogueguard.discovery.recorder import EventHook, ObservationHook, Recorder
 from rogueguard.discovery.router_tap import RouterTap
 from rogueguard.discovery.sniffer import PacketHook, Sniffer
 
@@ -14,10 +14,11 @@ log = logging.getLogger("rogueguard.discovery")
 
 class Discovery:
     def __init__(self, cfg: dict, on_event: EventHook | None = None,
-                 packet_hooks: list[PacketHook] | None = None) -> None:
+                 packet_hooks: list[PacketHook] | None = None,
+                 on_observation: ObservationHook | None = None) -> None:
         self.cfg = cfg
         self.stop_event = threading.Event()
-        self.recorder = Recorder(cfg["database"]["path"], on_event)
+        self.recorder = Recorder(cfg["database"]["path"], on_event, on_observation)
         dedup = ArpDedup(cfg["discovery"]["arp_record_every"])
         self.sniffer = Sniffer(cfg, self.recorder, dedup, packet_hooks)
         self.tap = RouterTap(cfg, self.sniffer.record_publish)

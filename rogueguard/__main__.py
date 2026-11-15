@@ -1,7 +1,7 @@
 """RogueGuard komut satırı: python -m rogueguard <discover|learn|protect|sync>.
 
-discover: sadece keşif (6.1). learn: öğrenme modu (6.2). sync: rg_approved/rg_block'u DB'den doldurur.
-protect sonraki adımda eklenir.
+discover: sadece keşif (6.1). learn: öğrenme modu (6.2). protect: keşif + karar motoru (6.3,
+alarm yazar, karantina 6.4'te). sync: rg_approved/rg_block'u DB'den doldurur.
 Ham soket gerektiği için root ya da CAP_NET_RAW,CAP_NET_ADMIN ile çalışır.
 """
 import argparse
@@ -17,6 +17,8 @@ def main() -> None:
     d.add_argument("--duration", type=float, default=None, help="saniye (boş = Ctrl+C'ye kadar)")
     l = sub.add_parser("learn", help="ağı öğren: nmap, onaylı envanter, rg_approved")
     l.add_argument("--duration", type=float, required=True, help="dinleme süresi (saniye)")
+    p = sub.add_parser("protect", help="keşfi çalıştır, karar motoruyla alarm üret")
+    p.add_argument("--duration", type=float, default=None, help="saniye (boş = Ctrl+C'ye kadar)")
     sub.add_parser("sync", help="router setlerini veritabanındaki duruma eşitle")
     args = ap.parse_args()
 
@@ -32,6 +34,14 @@ def main() -> None:
     elif args.cmd == "learn":
         from rogueguard.learn import learn
         learn(cfg, args.duration)
+    elif args.cmd == "protect":
+        from rogueguard.decision.engine import DecisionEngine
+        from rogueguard.discovery.runner import Discovery
+        engine = DecisionEngine(cfg)
+        engine.sweep()
+        disc = Discovery(cfg, on_observation=engine.on_observation)
+        disc.start()
+        disc.run_for(args.duration)
     elif args.cmd == "sync":
         from rogueguard import db
         from rogueguard.containment.router import Router
