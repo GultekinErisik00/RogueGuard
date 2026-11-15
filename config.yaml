@@ -22,3 +22,19 @@ router:
   table: "inet rg"
   approved_set: rg_approved
   block_set: rg_block
+
+database:
+  path: data/rogueguard.db      # repo köküne göre; daemon ve dashboard aynı dosyayı kullanır
+
+discovery:
+  arp_scan_interval: 30         # saniye: aktif ARP taraması
+  arp_record_every: 300         # aynı (mac, ip) ARP kaydı en fazla bu sıklıkla yazılır
+  mdns_query_interval: 120      # saniye: br-iot'a mDNS PTR sorgusu
+  traffic_window: 60            # saniye: trafik özet penceresi
+  mdns_types:
+    - _services._dns-sd._udp.local
+    - _http._tcp.local
+    - _rtsp._tcp.local
+    - _ipp._tcp.local
+    - _printer._tcp.local
+    - _hap._tcp.local

@@ -183,9 +183,9 @@ Durum işaretleri: `[x]` bitti, `[ ]` yapılacak, `[?]` kullanıcı yapmış ola
 - **Kontrol:** `logger -n <WAZUH_IP> -P 514 -d -t rogueguard '{"type":"arp_spoofing",...}'` → dashboard'da doğru kural ve T1557.002.
 
 ### Adım 5 — Proje iskeleti
-- [ ] `systemctl enable --now arpwatch@br-iot`
-- [ ] VM'de `~/rogueguard`, venv; `pip install scapy pyyaml requests streamlit pandas zeroconf openai paho-mqtt pytest`
-- [ ] Klasör yapısı (§8), `config.yaml`, SQLite şeması (WAL)
+- [x] `systemctl enable --now arpwatch@br-iot`
+- [x] VM'de `~/rogueguard`, venv; `pip install scapy pyyaml requests streamlit pandas zeroconf openai paho-mqtt pytest`
+- [x] Klasör yapısı (§8), `config.yaml`, SQLite şeması (WAL)
 - Daemon root/`CAP_NET_RAW,CAP_NET_ADMIN` ile çalışır (systemd unit'te `AmbientCapabilities`).
 
 ### Adım 6 — Modüller (her biri "Bitti" koşuluyla)

@@ -55,12 +55,24 @@
 - [x] **Kontrol geçti:** dnsmasq lease'lerinde 6 cihaz farklı hostname/OUI ile; dnsmasq log'unda vendor class'lar ve option 55 listeleri farklı. IP'ler geçici olarak `rg_approved`'a eklenince 6 istemci de broker'a bağlandı, 100 sn'de cam-01 ×4, cam-02 ×2, plug-01 ×10, temp-01 ×7, thermo-01 ×2 yayın (printer 300 sn aralıklı, bağlantısı görüldü). HTTP/RTSP banner'ları host'tan doğrulandı. mDNS: 8 servis örneği (cam ×2 http+rtsp, printer ipp+printer, plug http, thermo hap) cam-01 içinden zeroconf ile görüldü. Test sonrası `rg_approved` boşaltıldı.
 - Not: Alpine imajı varsayılan olarak dhcpcd kullanıyor; setup.sh onu kaldırıp udhcpc'yi `/etc/local.d` ile başlatıyor. Container'ın kendi `hostname` komutu Incus adını (ör. `cam-01`) gösteriyor; ağa çıkan hostname DHCP option 12 ve mDNS'tekidir.
 
+### Adım 5 — Proje iskeleti ✅
+- [x] `arpwatch@br-iot` enable + active (kıyaslama aracı)
+- [x] VM'de `~/rogueguard/.venv` (Python **3.14**): scapy 2.8.0, zeroconf 0.154, paho-mqtt 2.2, pytest 9.2, streamlit 1.67, pandas 3.1, openai 3.51, pyyaml, requests
+- [x] Paket iskeleti (§8), `rogueguard/config.py`, `rogueguard/db.py` (WAL; devices, observations, events, alerts, approvals). DB: `data/rogueguard.db` (gitignore'da)
+
+### 6.1 Keşif ✅
+- `discovery/arp_scan.py` (30 sn'de bir `srp` ARP taraması + 120 sn'de bir br-iot'a mDNS PTR sorgusu, `ArpDedup`), `discovery/sniffer.py` (tek `AsyncSniffer`: ARP, DHCP option 12/55/60/61/50 + ACK'te IP→MAC, mDNS cevapları, trafik), `fingerprint/{dhcp,mdns,traffic}.py`, `discovery/events.py` (new_device / changed_device), `discovery/recorder.py` (tek yazıcı thread), `discovery/runner.py`, `python -m rogueguard discover --duration N`
+- 8 birim testi geçiyor (`tests/test_discovery_units.py`)
+- [x] **Bitti kontrolü:** 150 sn keşif + cihaz restart'ı → 6 cihazın hepsi `observations`'ta `arp, dhcp, traffic`; mDNS profilinde olan 5 cihaz `mdns` ile de (temp-01'in profilinde mDNS yok). mDNS'ten servis türleri ve hostname'ler doğru çıktı.
+- Düzeltilen yanlış pozitifler: (1) thermo-01'in kapanışta gönderdiği DHCP RELEASE eksik option taşıdığı için "parmak izi değişti" sanıldı → parmak izi sadece DISCOVER/REQUEST'ten; (2) router'ın yönlendirdiği paketlerde kaynak IP başka cihazın olduğu için router "IP değişti" göründü → IP sadece ARP/DHCP'den izleniyor. Tekrar koşuda restart sonrası 0 yanlış olay.
+
 ### Karşılaşılan sorunlar
 - **systemd'li container'lar açılışta takılıyor (Ubuntu 26.10 host).** Debian 13 container'ında journald/networkd/resolved `(sd-mkuser...)` adımında asılı kalıyor, `eth0` IP almıyor; host dmesg'de `incus-<ad>` profili için AppArmor ptrace DENIED satırları. Neden: Ubuntu'ya özgü AppArmor kısıtı `kernel.apparmor_restrict_unprivileged_unconfined=1` (ve `..._userns=1`). Incus geliştiricisinin önerdiği çözüm bu sysctl'i 0 yapmak (lxc/incus#3251; Zabbly paketleri bunu artık otomatik yapıyor, Ubuntu'nun incus paketi yapmıyor). Host güvenlik ayarı olduğu için kullanıcı kendisi uyguladı; sonrasında sorun çözüldü.
 - Mac'teki proje klasörünün git kökü yanlışlıkla ev dizini (`/Users/gultekinqwe`) çıktı → proje klasöründe ayrı `git init` yapıldı.
 - İlk `ssh rogue` denemesi "No route to host" verdi; VM açıktı, birkaç saniye sonra düzeldi (Fusion NAT köprüsü geç ayağa kalktı).
 - **`systemctl restart nftables` Incus'un `inet incus` tablosunu sildi.** Ubuntu'nun `nftables.service` unit'inde `ExecStop=/usr/sbin/nft flush ruleset` var; dosyada `flush ruleset` olmasa bile restart/stop her şeyi siler. `systemctl restart incus` ile Incus kuralları geri geldi; kalıcı çözüm `lab/host/nftables-override.conf` → `/etc/systemd/system/nftables.service.d/override.conf` (ExecStop sadece `delete table inet rg_host`). Doğrulandı: restart sonrası iki tablo da duruyor.
 - **rg-router'da dnsmasq upstream'i.** Container'ın `/etc/resolv.conf`'u systemd-resolved stub'ı (127.0.0.53). `resolv-file=/run/systemd/resolve/resolv.conf` eklendi → upstream incusbr0 DNS'i (10.160.244.1).
+- **pip kurulumu 8+ dk sessizce takıldı** (`-q` ile tüm paketler tek seferde, Python 3.14). Çekirdek paketler ve streamlit/pandas/openai ayrı ayrı kurulunca birkaç dakikada bitti.
 
 ### Sıradaki adım
-Adım 5 (proje iskeleti: arpwatch@br-iot, venv, `rogueguard/` paketi, SQLite şeması) → 6.1 keşif → 6.2 öğrenme modu → 6.3 karar motoru (19 Kasım hedefi). Adım 4 (Wazuh) ara değerlendirmeden sonra.
+6.2 öğrenme modu (`learn --duration`, nmap, `devices` approved, `inventory.yaml`, `rg_approved`, benzerlik pytest'i) → 6.3 karar motoru.
