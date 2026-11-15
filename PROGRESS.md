@@ -66,6 +66,14 @@
 - [x] **Bitti kontrolü:** 150 sn keşif + cihaz restart'ı → 6 cihazın hepsi `observations`'ta `arp, dhcp, traffic`; mDNS profilinde olan 5 cihaz `mdns` ile de (temp-01'in profilinde mDNS yok). mDNS'ten servis türleri ve hostname'ler doğru çıktı.
 - Düzeltilen yanlış pozitifler: (1) thermo-01'in kapanışta gönderdiği DHCP RELEASE eksik option taşıdığı için "parmak izi değişti" sanıldı → parmak izi sadece DISCOVER/REQUEST'ten; (2) router'ın yönlendirdiği paketlerde kaynak IP başka cihazın olduğu için router "IP değişti" göründü → IP sadece ARP/DHCP'den izleniyor. Tekrar koşuda restart sonrası 0 yanlış olay.
 
+### 6.2 Öğrenme modu ✅
+- `sudo .venv/bin/python -m rogueguard learn --duration 150`: keşfi çalıştırır, görülen her cihazı bir kez `nmap -sT -sV` ile tarar (sadece lab alt ağına izin verir), `devices` tablosuna `approved` yazar, `inventory.yaml` üretir ve `rg_approved` setini router'da doldurur. `sync` komutu aynı seti DB'den yeniden kurar.
+- Router (10.20.0.1) `infrastructure` olarak envantere girer, `rg_approved`'a eklenmez.
+- Kontrol: envanterde 6 meşru cihaz + router; `rg_approved` içinde 6 IP; 14 test geçiyor.
+- Benzerlik (`fingerprint/compare.py`, ağırlıklar `config.yaml`): meşru cihaz çiftlerinde skor 0.14–0.25, cam-01/cam-02 = 0.86 (bilinçli ikiz, tek istisna). Eşik `similarity_max: 0.6`. Test hem `lab/devices.yaml`'dan hem canlı envanterden çalışır.
+- Bulgu: nmap, Debian cihazlarda 5355/tcp (LLMNR) açık gösterdi; port kümesi gerçek servisleri yansıtıyor.
+- **Sınırlılık:** `yayın aralığı` (publish_interval) hiçbir cihaz için dolmadı. br-iot köprüsü cihaz→router unicast trafiğini host'a iletmiyor; sniffer sadece bağlantı paketlerini görüyor, MQTT yayınlarını görmüyor. Çözüm adayı (6.3'te karar): router'da `tcpdump -i eth1 'tcp dst port 1883'` çıktısını sniffer'a beslemek. O zamana kadar `interval` özelliği benzerlikte yalnızca "ikisi de boş" olarak eşleşir.
+
 ### Karşılaşılan sorunlar
 - **systemd'li container'lar açılışta takılıyor (Ubuntu 26.10 host).** Debian 13 container'ında journald/networkd/resolved `(sd-mkuser...)` adımında asılı kalıyor, `eth0` IP almıyor; host dmesg'de `incus-<ad>` profili için AppArmor ptrace DENIED satırları. Neden: Ubuntu'ya özgü AppArmor kısıtı `kernel.apparmor_restrict_unprivileged_unconfined=1` (ve `..._userns=1`). Incus geliştiricisinin önerdiği çözüm bu sysctl'i 0 yapmak (lxc/incus#3251; Zabbly paketleri bunu artık otomatik yapıyor, Ubuntu'nun incus paketi yapmıyor). Host güvenlik ayarı olduğu için kullanıcı kendisi uyguladı; sonrasında sorun çözüldü.
 - Mac'teki proje klasörünün git kökü yanlışlıkla ev dizini (`/Users/gultekinqwe`) çıktı → proje klasöründe ayrı `git init` yapıldı.
@@ -75,4 +83,4 @@
 - **pip kurulumu 8+ dk sessizce takıldı** (`-q` ile tüm paketler tek seferde, Python 3.14). Çekirdek paketler ve streamlit/pandas/openai ayrı ayrı kurulunca birkaç dakikada bitti.
 
 ### Sıradaki adım
-6.2 öğrenme modu (`learn --duration`, nmap, `devices` approved, `inventory.yaml`, `rg_approved`, benzerlik pytest'i) → 6.3 karar motoru.
+6.3 karar motoru (`decision/engine.py`: özellik skoru + `detection_profile` allowlist/fingerprint/full, `unknown_device` → pending, yanlış pozitif önlemleri). Önce yayın aralığı için router'dan trafik görünürlüğü kararı verilecek.
