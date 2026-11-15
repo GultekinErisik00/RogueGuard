@@ -52,6 +52,11 @@ class Sniffer:
         for mac, ip, data in summaries:
             self._recorder.record(mac, ip, "traffic", data)
 
+    def record_publish(self, ts: float, mac: str, src_ip: str, dst_ip: str, dport: int) -> None:
+        """RouterTap'ten gelen MQTT PUBLISH'i aynı trafik penceresine ekler."""
+        with self._lock:
+            self._traffic.add_publish(ts, mac.lower(), src_ip, dst_ip, dport)
+
     # --- paket işleme -----------------------------------------------------------
     def _handle(self, pkt: Any) -> None:
         if Ether not in pkt or pkt[Ether].src.lower() == self._own_mac:

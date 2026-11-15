@@ -66,12 +66,14 @@ def test_arp_dedup_limits_repeats():
 def test_traffic_window_publish_interval():
     w = TrafficWindow()
     for t in (0, 10, 20, 30):
-        w.add(t, "aa", "10.20.0.5", "10.20.2.10", 1883, "tcp", 40)
+        w.add_publish(t, "aa", "10.20.0.5", "10.20.2.10", 1883)
     w.add(31, "aa", "10.20.0.5", "10.20.0.1", 53, "udp", 30)
     [(mac, ip, data)] = w.flush()
     assert data["publishes"] == 4 and data["publish_interval_median"] == 10
     assert data["destinations"] == ["10.20.0.1:53/udp", "10.20.2.10:1883/tcp"]
     assert w.flush() == []
+    w.add_publish(330, "aa", "10.20.0.5", "10.20.2.10", 1883)   # sonraki pencere
+    assert w.flush()[0][2]["publish_interval_median"] == 300
 
 
 def test_db_roundtrip(tmp_path):
@@ -79,3 +81,13 @@ def test_db_roundtrip(tmp_path):
     db.add_observation(conn, "aa", "1.2.3.4", "arp", {"x": 1})
     assert db.known_macs(conn) == {"aa"}
     assert conn.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
+
+
+def test_router_tap_parses_tcpdump_line():
+    from rogueguard.discovery.router_tap import parse_line
+    line = ("1794760489.277713 00:4b:12:7c:1e:09 > 10:66:6a:01:0d:3f, ethertype IPv4 "
+            "(0x0800), length 144: 10.20.0.148.51539 > 10.20.2.10.1883: Flags [P.], "
+            "seq 1:79, ack 1, win 63, length 78")
+    assert parse_line(line) == (1794760489.277713, "00:4b:12:7c:1e:09", "10.20.0.148",
+                                "10.20.2.10", 1883)
+    assert parse_line("listening on eth1, link-type EN10MB") is None

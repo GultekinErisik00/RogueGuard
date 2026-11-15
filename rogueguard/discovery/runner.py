@@ -1,11 +1,12 @@
 """Keşif modülünü bir arada çalıştırır: pasif sniffer + aktif ARP/mDNS döngüsü +
-trafik penceresi. learn ve protect modları bunun üzerine kurulur."""
+router'daki MQTT yayın dinleyicisi + trafik penceresi. learn ve protect modları bunun üzerine kurulur."""
 import logging
 import threading
 import time
 
 from rogueguard.discovery.arp_scan import ArpDedup, active_loop
 from rogueguard.discovery.recorder import EventHook, Recorder
+from rogueguard.discovery.router_tap import RouterTap
 from rogueguard.discovery.sniffer import PacketHook, Sniffer
 
 log = logging.getLogger("rogueguard.discovery")
@@ -19,6 +20,7 @@ class Discovery:
         self.recorder = Recorder(cfg["database"]["path"], on_event)
         dedup = ArpDedup(cfg["discovery"]["arp_record_every"])
         self.sniffer = Sniffer(cfg, self.recorder, dedup, packet_hooks)
+        self.tap = RouterTap(cfg, self.sniffer.record_publish)
         self._active = threading.Thread(target=active_loop, name="active",
                                         args=(cfg, self.recorder, dedup, self.stop_event),
                                         daemon=True)
@@ -26,6 +28,7 @@ class Discovery:
     def start(self) -> None:
         self.recorder.start()
         self.sniffer.start()
+        self.tap.start()
         self._active.start()
         log.info("keşif başladı: %s", self.cfg["network"]["iot_iface"])
 
@@ -44,6 +47,7 @@ class Discovery:
     def stop(self) -> None:
         self.stop_event.set()
         self.sniffer.stop()
+        self.tap.stop()
         self.sniffer.flush_traffic()
         self.recorder.stop()
         log.info("keşif durdu")
