@@ -1,0 +1,8 @@
+# rg-router eth1 statik adresi (systemd-networkd)
+[Match]
+Name=eth1
+
+[Network]
+Address=10.20.0.1/24
+LinkLocalAddressing=no
+IPv6AcceptRA=no

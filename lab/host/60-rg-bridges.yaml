@@ -1,0 +1,18 @@
+# VM host'u: üç lab köprüsü. /etc/netplan/60-rg-bridges.yaml olarak kopyalanır (izin 600).
+# br-iot üzerindeki adres RogueGuard'ın tarama/dinleme adresidir (DHCP havuzu dışında).
+network:
+  version: 2
+  bridges:
+    br-iot:
+      addresses: [10.20.0.2/24]
+      link-local: []
+      optional: true
+      parameters: {stp: false, forward-delay: 0}
+    br-quar:
+      link-local: []
+      optional: true
+      parameters: {stp: false, forward-delay: 0}
+    br-svc:
+      link-local: []
+      optional: true
+      parameters: {stp: false, forward-delay: 0}

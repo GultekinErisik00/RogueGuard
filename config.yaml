@@ -1,0 +1,24 @@
+# RogueGuard yapılandırması. Lab adresleri CLAUDE.md §3 ile aynı olmalı.
+# Gizli bilgiler (GROQ_API_KEY) burada değil, .env içinde durur.
+
+network:
+  iot_iface: br-iot
+  iot_subnet: 10.20.0.0/24
+  iot_gw_ip: 10.20.0.1          # rg-router eth1
+  sensor_iot_ip: 10.20.0.2      # host'un br-iot adresi (DHCP havuzu dışında)
+  iot_dhcp: [10.20.0.100, 10.20.0.199]
+  quar_subnet: 10.20.1.0/24
+  quar_gw_ip: 10.20.1.1
+  quar_dhcp: [10.20.1.100, 10.20.1.199]
+  svc_subnet: 10.20.2.0/24
+  svc_gw_ip: 10.20.2.1
+  svc_dhcp: [10.20.2.100, 10.20.2.199]
+  broker_mac: "00:16:3e:20:02:10"
+  broker_ip: 10.20.2.10
+  wazuh_ip: null                # Adım 4'te incusbr0 içinden seçilecek
+
+router:
+  container: rg-router
+  table: "inet rg"
+  approved_set: rg_approved
+  block_set: rg_block
