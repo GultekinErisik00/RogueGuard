@@ -154,18 +154,18 @@ Durum işaretleri: `[x]` bitti, `[ ]` yapılacak, `[?]` kullanıcı yapmış ola
 ### Adım 1 — VM temel ayarları
 - [x] Ubuntu 26.10 arm64 kuruldu, hostname `rogueguard-lab`, kullanıcı `rogue`
 - [x] Mac'ten `ssh rogue` (anahtarla) çalışıyor
-- [?] Kök bölüm büyütüldü: `df -h /` ~57 GB göstermeli. Değilse: `sudo lvextend -r -l +100%FREE /dev/ubuntu-vg/ubuntu-lv`
-- [?] Şifresiz sudo: `sudo -n true` başarılı olmalı. Değilse kullanıcıdan iste (`/etc/sudoers.d/rogue`)
-- [ ] `apt update && apt -y upgrade`; `apt install -y incus git nmap tcpdump python3-venv tmux rsync arpwatch`
-- [ ] 4 GB swap (`/swapfile`, fstab'a ekle)
-- [ ] `vm.max_map_count=262144` (`/etc/sysctl.d/90-wazuh.conf`)
-- [ ] `usermod -aG incus-admin rogue`, `incus admin init --minimal`
+- [x] Kök bölüm büyütüldü: `df -h /` ~57 GB göstermeli. Değilse: `sudo lvextend -r -l +100%FREE /dev/ubuntu-vg/ubuntu-lv`
+- [x] Şifresiz sudo: `sudo -n true` başarılı olmalı. Değilse kullanıcıdan iste (`/etc/sudoers.d/rogue`)
+- [x] `apt update && apt -y upgrade`; `apt install -y incus git nmap tcpdump python3-venv tmux rsync arpwatch`
+- [x] 4 GB swap (`/swapfile`, fstab'a ekle)
+- [x] `vm.max_map_count=262144` (`/etc/sysctl.d/90-wazuh.conf`)
+- [x] `usermod -aG incus-admin rogue`, `incus admin init --minimal`
 - **Kontrol:** geçici bir `images:debian/13` container'ı internete ping atabiliyor; sonra silinir.
 
 ### Adım 2 — Köprüler ve router
-- [ ] `/etc/netplan/60-rg-bridges.yaml`: `br-iot` (`<SENSOR_IOT_IP>/<IOT_PREFIX>`), `br-quar`, `br-svc`; hepsi `link-local: []`, `stp: false`, `forward-delay: 0`; dosya izni 600; `netplan apply`
-- [ ] Host `/etc/nftables.conf`: sadece `inet rg_host` tablosu, forward hook priority -5, `br-iot|br-quar|br-svc` giriş/çıkışını drop. `flush ruleset` yok. `systemctl enable --now nftables`
-- [ ] `rg-router` container: 4 NIC, `nftables` + `dnsmasq`, systemd-networkd ile statik adresler, `ip_forward=1`, dnsmasq 3 DHCP aralığı + broker için `dhcp-host`, `inet rg` tablosu (§4)
+- [x] `/etc/netplan/60-rg-bridges.yaml`: `br-iot` (`<SENSOR_IOT_IP>/<IOT_PREFIX>`), `br-quar`, `br-svc`; hepsi `link-local: []`, `stp: false`, `forward-delay: 0`; dosya izni 600; `netplan apply`
+- [x] Host `/etc/nftables.conf`: sadece `inet rg_host` tablosu, forward hook priority -5, `br-iot|br-quar|br-svc` giriş/çıkışını drop. `flush ruleset` yok. `systemctl enable --now nftables`
+- [x] `rg-router` container: 4 NIC, `nftables` + `dnsmasq`, systemd-networkd ile statik adresler, `ip_forward=1`, dnsmasq 3 DHCP aralığı + broker için `dhcp-host`, `inet rg` tablosu (§4)
 - **Kontrol:** `br-iot`'a bağlanan geçici container router'dan IP alıyor; `rg_approved`'a eklenene kadar internete çıkamıyor, eklenince çıkabiliyor.
 
 ### Adım 3 — Broker ve cihazlar
