@@ -38,6 +38,23 @@
 - [x] `rg-router` (Debian 13): eth0 incusbr0 (DHCP, 10.160.244.190), eth1 10.20.0.1, eth2 10.20.1.1, eth3 10.20.2.1; `ip_forward=1`; dnsmasq 3 havuz + broker `dhcp-host`; `inet rg` tablosu. Dosyalar `lab/router/`.
 - [x] **Kontrol geçti** (geçici Alpine `t-iot`, br-iot): DHCP'den 10.20.0.172 aldı; DNS router üzerinden çözüyor; onaysızken internet BLOCKED → `rg_approved`'a eklenince REACHED → `rg_block`'a eklenince BLOCKED (sayaçlar arttı). Host br-iot'tan router'a ping OK.
 
+### Adım 3 — Broker ve cihazlar ✅
+- [x] `mqtt-broker` (Debian 13, br-svc, 00:16:3e:20:02:10) → 10.20.2.10, mosquitto `listener 1883 0.0.0.0`, anonim
+- [x] `lab/devices.yaml` (6 profil = doğru cevap etiketi), `lab/agent/device_agent.py`, `lab/agent/setup.sh`, `lab/build_lab.py`
+- [x] 6 cihaz kuruldu, hepsinde `clean` snapshot
+
+| Cihaz | İmaj | DHCP istemcisi | MAC (OUI) | Hostname | IP (ilk lease) |
+| --- | --- | --- | --- | --- | --- |
+| cam-01 | alpine/3.22 | udhcpc | 00:40:8c (Axis) | axis-m3045-51b2 | 10.20.0.111 |
+| cam-02 | alpine/3.22 | udhcpc | 00:40:8c (Axis) | axis-m3045-77e4 | 10.20.0.123 |
+| printer-01 | debian/12 | dhclient | 00:1b:a9 (Brother) | BRN001BA96C208F | 10.20.0.137 |
+| plug-01 | debian/13 | dhcpcd | 00:11:50 (Belkin) | wemo-mini-5f2a | 10.20.0.138 |
+| temp-01 | alpine/3.21 | udhcpc (`-O ntpsrv -O timezone`) | 00:4b:12 (Espressif) | esp32-sht31-7c1e | 10.20.0.148 |
+| thermo-01 | ubuntu/24.04 | systemd-networkd | 44:61:32 (ecobee) | ecobee3-lite-21f0 | 10.20.0.169 |
+
+- [x] **Kontrol geçti:** dnsmasq lease'lerinde 6 cihaz farklı hostname/OUI ile; dnsmasq log'unda vendor class'lar ve option 55 listeleri farklı. IP'ler geçici olarak `rg_approved`'a eklenince 6 istemci de broker'a bağlandı, 100 sn'de cam-01 ×4, cam-02 ×2, plug-01 ×10, temp-01 ×7, thermo-01 ×2 yayın (printer 300 sn aralıklı, bağlantısı görüldü). HTTP/RTSP banner'ları host'tan doğrulandı. mDNS: 8 servis örneği (cam ×2 http+rtsp, printer ipp+printer, plug http, thermo hap) cam-01 içinden zeroconf ile görüldü. Test sonrası `rg_approved` boşaltıldı.
+- Not: Alpine imajı varsayılan olarak dhcpcd kullanıyor; setup.sh onu kaldırıp udhcpc'yi `/etc/local.d` ile başlatıyor. Container'ın kendi `hostname` komutu Incus adını (ör. `cam-01`) gösteriyor; ağa çıkan hostname DHCP option 12 ve mDNS'tekidir.
+
 ### Karşılaşılan sorunlar
 - **systemd'li container'lar açılışta takılıyor (Ubuntu 26.10 host).** Debian 13 container'ında journald/networkd/resolved `(sd-mkuser...)` adımında asılı kalıyor, `eth0` IP almıyor; host dmesg'de `incus-<ad>` profili için AppArmor ptrace DENIED satırları. Neden: Ubuntu'ya özgü AppArmor kısıtı `kernel.apparmor_restrict_unprivileged_unconfined=1` (ve `..._userns=1`). Incus geliştiricisinin önerdiği çözüm bu sysctl'i 0 yapmak (lxc/incus#3251; Zabbly paketleri bunu artık otomatik yapıyor, Ubuntu'nun incus paketi yapmıyor). Host güvenlik ayarı olduğu için kullanıcı kendisi uyguladı; sonrasında sorun çözüldü.
 - Mac'teki proje klasörünün git kökü yanlışlıkla ev dizini (`/Users/gultekinqwe`) çıktı → proje klasöründe ayrı `git init` yapıldı.
@@ -46,4 +63,4 @@
 - **rg-router'da dnsmasq upstream'i.** Container'ın `/etc/resolv.conf`'u systemd-resolved stub'ı (127.0.0.53). `resolv-file=/run/systemd/resolve/resolv.conf` eklendi → upstream incusbr0 DNS'i (10.160.244.1).
 
 ### Sıradaki adım
-Adım 3: `mqtt-broker` (br-svc, 00:16:3e:20:02:10), `lab/devices.yaml`, `lab/agent/device_agent.py` + `setup.sh`, `lab/build_lab.py`, 6 cihaz + `clean` snapshot.
+Adım 5 (proje iskeleti: arpwatch@br-iot, venv, `rogueguard/` paketi, SQLite şeması) → 6.1 keşif → 6.2 öğrenme modu → 6.3 karar motoru (19 Kasım hedefi). Adım 4 (Wazuh) ara değerlendirmeden sonra.

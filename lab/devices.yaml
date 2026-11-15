@@ -1,0 +1,124 @@
+# Meşru IoT cihaz profilleri — lab/build_lab.py bu dosyadan cihazları üretir.
+# Bu dosya aynı zamanda doğru cevap etiketidir (type alanı = gerçek cihaz türü).
+# Hocanın 1. geri bildirimi: her cihaz farklı imaj, DHCP istemcisi, OUI, hostname,
+# vendor class, port ve mDNS servisi kullanır. cam-02, cam-01'in bilinçli ikizidir.
+# OUI'ler /usr/share/nmap/nmap-mac-prefixes içindeki gerçek üreticilerden seçildi.
+
+broker: {ip: 10.20.2.10, port: 1883}
+
+devices:
+  cam-01:
+    type: camera
+    vendor: Axis Communications AB
+    image: images:alpine/3.22
+    mac: "00:40:8c:3a:51:b2"
+    hostname: axis-m3045-51b2
+    dhcp_client: udhcpc
+    vendor_class: "AXIS,Network Camera,M3045-V"
+    udhcpc_extra: []                    # udhcpc varsayılan option 55 listesi
+    services:
+      - {port: 80,  kind: http, banner: "Boa/0.94.14rc21", title: "AXIS M3045-V Network Camera"}
+      - {port: 554, kind: rtsp, banner: "AXIS M3045-V RTSP Server"}
+    mdns:
+      - {type: _http._tcp, port: 80}
+      - {type: _rtsp._tcp, port: 554}
+    mqtt:
+      topic: lab/cam-01/motion
+      mode: irregular                   # hareket olayı: üstel dağılımlı aralık
+      mean_interval: 45
+      payload: {event: motion, zone: 1}
+
+  cam-02:
+    type: camera
+    vendor: Axis Communications AB
+    image: images:alpine/3.22
+    mac: "00:40:8c:3a:77:e4"            # cam-01 ile sadece son 3 byte ve hostname farklı
+    hostname: axis-m3045-77e4
+    dhcp_client: udhcpc
+    vendor_class: "AXIS,Network Camera,M3045-V"
+    udhcpc_extra: []
+    services:
+      - {port: 80,  kind: http, banner: "Boa/0.94.14rc21", title: "AXIS M3045-V Network Camera"}
+      - {port: 554, kind: rtsp, banner: "AXIS M3045-V RTSP Server"}
+    mdns:
+      - {type: _http._tcp, port: 80}
+      - {type: _rtsp._tcp, port: 554}
+    mqtt:
+      topic: lab/cam-02/motion
+      mode: irregular
+      mean_interval: 45
+      payload: {event: motion, zone: 1}
+
+  printer-01:
+    type: printer
+    vendor: Brother industries
+    image: images:debian/12
+    mac: "00:1b:a9:6c:20:8f"
+    hostname: BRN001BA96C208F            # Brother'ın gerçek adlandırma kalıbı
+    dhcp_client: dhclient
+    vendor_class: "Brother HL-L2350DW"
+    services:
+      - {port: 631,  kind: http, banner: "debut/1.30", title: "Brother HL-L2350DW IPP"}
+      - {port: 9100, kind: raw}
+    mdns:
+      - {type: _ipp._tcp, port: 631}
+      - {type: _printer._tcp, port: 515}
+    mqtt:
+      topic: lab/printer-01/status
+      mode: periodic
+      interval: 300
+      payload: {state: idle, toner: 62}
+
+  plug-01:
+    type: smart_plug
+    vendor: Belkin
+    image: images:debian/13
+    mac: "00:11:50:5f:2a:c3"
+    hostname: wemo-mini-5f2a
+    dhcp_client: dhcpcd
+    vendor_class: "Belkin-WeMo-Insight"
+    services:
+      - {port: 80,    kind: http, banner: "lighttpd/1.4.35", title: "WeMo Insight"}
+      - {port: 49153, kind: http, banner: "Unspecified, UPnP/1.0, Unspecified", title: "WeMo UPnP"}
+    mdns:
+      - {type: _http._tcp, port: 80}
+    mqtt:
+      topic: lab/plug-01/power
+      mode: periodic
+      interval: 10
+      payload: {watts: 41.5, on: true}
+
+  temp-01:
+    type: sensor
+    vendor: Espressif
+    image: images:alpine/3.21
+    mac: "00:4b:12:7c:1e:09"
+    hostname: esp32-sht31-7c1e
+    dhcp_client: udhcpc
+    vendor_class: "ESP32-SHT31-Sensor"
+    udhcpc_extra: [ntpsrv, timezone]     # option 55'i cam-01'den farklılaştırır
+    services: []
+    mdns: []
+    mqtt:
+      topic: lab/temp-01/temperature
+      mode: periodic
+      interval: 15
+      payload: {celsius: 22.4, humidity: 41}
+
+  thermo-01:
+    type: thermostat
+    vendor: ecobee
+    image: images:ubuntu/24.04
+    mac: "44:61:32:21:f0:5d"
+    hostname: ecobee3-lite-21f0
+    dhcp_client: systemd-networkd
+    vendor_class: "ecobee-thermostat-eb3lite"
+    services:
+      - {port: 80, kind: http, banner: "ecobee-httpd/2.1", title: "ecobee3 lite"}
+    mdns:
+      - {type: _hap._tcp, port: 80}
+    mqtt:
+      topic: lab/thermo-01/setpoint
+      mode: periodic
+      interval: 60
+      payload: {setpoint: 21.0, mode: heat}

@@ -169,9 +169,9 @@ Durum işaretleri: `[x]` bitti, `[ ]` yapılacak, `[?]` kullanıcı yapmış ola
 - **Kontrol:** `br-iot`'a bağlanan geçici container router'dan IP alıyor; `rg_approved`'a eklenene kadar internete çıkamıyor, eklenince çıkabiliyor.
 
 ### Adım 3 — Broker ve cihazlar
-- [ ] `mqtt-broker` (`listener 1883 0.0.0.0`, `allow_anonymous true`), `br-svc`, `hwaddr=<BROKER_MAC>`
-- [ ] `lab/devices.yaml`, `lab/agent/` (device_agent.py, setup.sh), `lab/build_lab.py`
-- [ ] 6 cihazı oluştur, `clean` snapshot al
+- [x] `mqtt-broker` (`listener 1883 0.0.0.0`, `allow_anonymous true`), `br-svc`, `hwaddr=<BROKER_MAC>`
+- [x] `lab/devices.yaml`, `lab/agent/` (device_agent.py, setup.sh), `lab/build_lab.py`
+- [x] 6 cihazı oluştur, `clean` snapshot al
 - **Kontrol:** `incus exec rg-router -- cat /var/lib/misc/dnsmasq.leases` → 6 cihaz, farklı hostname ve üretici. IP'leri geçici olarak `rg_approved`'a ekleyince `incus exec mqtt-broker -- mosquitto_sub -t '#' -v` tüm yayınları gösteriyor.
 
 ### Adım 4 — Wazuh (ara değerlendirmeden sonra yapılabilir)
