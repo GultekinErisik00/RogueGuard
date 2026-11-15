@@ -25,7 +25,15 @@
 | `<BROKER_MAC>` / `<BROKER_IP>` | 00:16:3e:20:02:10 / 10.20.2.10 |
 | `<WAZUH_IP>` | Adım 4'te (incusbr0 subnet'i belli olunca) |
 
+### Adım 1 ilerlemesi
+- [x] Şifresiz sudo (`/etc/sudoers.d/rogue`, kullanıcı ekledi)
+- [x] `lvextend -r` → `/` 56 GB
+- [x] apt upgrade; incus 7.0.1, nmap, arpwatch, python3-venv, dsniff kuruldu
+- [x] `rogue` → `incus-admin`; `incus admin init --minimal` → `incusbr0` = 10.160.244.1/24 (lab subnet'leriyle çakışmıyor), storage `default` (dir)
+- [ ] **Kontrol takıldı:** `images:debian/13` container'ı IP almıyor (aşağıya bak). `images:alpine` container'ı internete ping atabiliyor → NAT/ağ sağlam.
+
 ### Karşılaşılan sorunlar
+- **systemd'li container'lar açılışta takılıyor (Ubuntu 26.10 host).** Debian 13 container'ında journald/networkd/resolved `(sd-mkuser...)` adımında asılı kalıyor, `eth0` IP almıyor; host dmesg'de `incus-<ad>` profili için AppArmor ptrace DENIED satırları. Neden: Ubuntu'ya özgü AppArmor kısıtı `kernel.apparmor_restrict_unprivileged_unconfined=1` (ve `..._userns=1`). Incus geliştiricisinin önerdiği çözüm bu sysctl'i 0 yapmak (lxc/incus#3251; Zabbly paketleri bunu artık otomatik yapıyor, Ubuntu'nun incus paketi yapmıyor). Host güvenlik ayarı olduğu için kullanıcı onayıyla uygulanacak.
 - Mac'teki proje klasörünün git kökü yanlışlıkla ev dizini (`/Users/gultekinqwe`) çıktı → proje klasöründe ayrı `git init` yapıldı.
 - İlk `ssh rogue` denemesi "No route to host" verdi; VM açıktı, birkaç saniye sonra düzeldi (Fusion NAT köprüsü geç ayağa kalktı).
 
