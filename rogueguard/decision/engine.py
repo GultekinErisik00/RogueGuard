@@ -9,7 +9,7 @@
 
 `detection_profile`: allowlist (sadece MAC) | fingerprint (MAC + DHCP parmak izi) | full.
 `full` şimdilik `fingerprint` ile aynıdır; abnormal_behavior (K ardışık pencere) sonra eklenecek.
-Alarm yazar ama karantina uygulamaz; aksiyon 6.4'te (containment) alarma bağlanır.
+Alarm yazar; aksiyonu `on_alert` kancası üzerinden containment/actions.py uygular.
 """
 import json
 import logging
@@ -28,6 +28,7 @@ PROFILES = ("allowlist", "fingerprint", "full")
 FP_MSG_TYPES = {"discover", "request"}
 IP_SOURCES = {"arp", "dhcp"}                             # IP sadece bunlardan güvenilir okunur
 IpChangeHook = Callable[[str, str | None, str], None]    # (mac, eski_ip, yeni_ip)
+AlertHook = Callable[[sqlite3.Connection, int], None]    # (bağlantı, alarm id) → aksiyon (6.4)
 DHCP_FEATURES = ("hostname", "opt55", "vendor_class")   # DHCP paketinden okunan özellikler
 
 
@@ -53,7 +54,8 @@ def observed_profile(inventory: dict[str, Any], dhcp: dict[str, Any]) -> dict[st
 class DecisionEngine:
     def __init__(self, cfg: dict[str, Any], conn: sqlite3.Connection | None = None,
                  clock: Callable[[], float] = time.time,
-                 on_ip_change: IpChangeHook | None = None) -> None:
+                 on_ip_change: IpChangeHook | None = None,
+                 on_alert: AlertHook | None = None) -> None:
         dcfg = cfg["decision"]
         if dcfg["detection_profile"] not in PROFILES:
             raise ValueError(f"detection_profile {dcfg['detection_profile']!r}, "
@@ -68,6 +70,7 @@ class DecisionEngine:
         self._local = threading.local()   # SQLite bağlantısı thread'ler arası paylaşılamaz
         self._clock = clock
         self._on_ip_change = on_ip_change
+        self._on_alert = on_alert
 
     def _conn(self) -> sqlite3.Connection:
         if self._injected is not None:
@@ -147,8 +150,10 @@ class DecisionEngine:
         if recent:
             return
         attack = ATTACKS[atype]
-        conn.execute("INSERT INTO alerts (ts, mac, ip, type, severity, attack_id, action, "
-                     "reason, detected_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                     (now, mac, ip, atype, attack.severity, attack.attack_id, attack.action,
-                      reason, now))
+        cur = conn.execute("INSERT INTO alerts (ts, mac, ip, type, severity, attack_id, action, "
+                           "reason, detected_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                           (now, mac, ip, atype, attack.severity, attack.attack_id,
+                            attack.action, reason, now))
         log.warning("ALARM %s %s %s: %s", atype, mac, ip, reason)
+        if self._on_alert:
+            self._on_alert(conn, cur.lastrowid)

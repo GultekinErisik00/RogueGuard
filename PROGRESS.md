@@ -83,6 +83,14 @@
 - **Kontrol R1 (canlı):** `images:fedora/43` rogue container'ı br-iot'a bağlandı → `unknown_device` (T1200, pending), broker'a erişemiyor (TCP 1883 kapalı). 6 koşu (her biri yeni MAC): 6/6 yakalandı, tespit süresi 0.44–0.71 sn (medyan 0.48). arpwatch aynı cihazı `new station` olarak 6.3–9.2 sn'de gördü (medyan 8.8). Ayrıntı: `notes/R1 İlk Ölçümler.md`.
 - **Henüz yapılmadı (deneylerden önce):** `full` profilinin `abnormal_behavior` (K ardışık pencere) kısmı ve `arp_guard.py` (R4 için); `full` şimdilik `fingerprint` ile aynı. IP taşıma kancası birim testli, canlı olarak B2 senaryosunda (kiralama silme) denenecek.
 
+### 6.4 Karantina ✅ (16 Kasım)
+- `containment/quarantine.py`: `incus list --format json` çıktısından MAC'i taşıyan, br-iot'ta çalışan container'ı bulur, `incus config device set <ad> eth0 parent=br-quar` ile taşır. MAC hem Incus yapılandırmasından hem çalışma anındaki arayüzden okunur (saldırgan MAC'i içeriden değiştirir). Aynı MAC'li iki container varsa IP'si envanterdekiyle uyuşmayan, o da ayırt etmezse en son oluşturulan seçilir.
+- `containment/actions.py`: alarmın `action` alanını uygular (`quarantine` → br-quar, `block` → `rg_block`, `pending` → dokunmaz), `alerts.contained_at` yazar. MAC taklidinde `devices` satırı kurbana ait olduğu için kurbanın durumu değişmez; diğer türlerde cihaz `quarantined`/`blocked` olur ve IP'si `rg_approved`'dan çıkar.
+- Karar motoru `on_alert` kancasıyla bağlı; `config.yaml` `containment.enabled: false` sadece alarm modudur.
+- 37 test geçiyor (9'u `tests/test_containment.py`).
+- **Kontrol (canlı, kurban açık):** Fedora rogue br-iot'a bağlandı (`unknown_device`), sonra içeriden cam-01'in MAC'ine geçti → `impersonation` (T1036; farklı: hostname, opt55, vendor_class) → rogue-r2 br-quar'a taşındı. MAC değişiminden itibaren tespit 0.07 sn, karantina 0.20 sn. Rogue karantinada 10.20.1.130 aldı, broker'a ve kurbana ulaşamıyor; cam-01 br-iot'ta, `approved`, broker'a ulaşıyor.
+- **Canlı denenmedi:** `block` yolu (onu tetikleyen `abnormal_scan`/`abnormal_behavior` tespiti henüz yok; birim testli).
+
 ### Karşılaşılan sorunlar
 - **systemd'li container'lar açılışta takılıyor (Ubuntu 26.10 host).** Debian 13 container'ında journald/networkd/resolved `(sd-mkuser...)` adımında asılı kalıyor, `eth0` IP almıyor; host dmesg'de `incus-<ad>` profili için AppArmor ptrace DENIED satırları. Neden: Ubuntu'ya özgü AppArmor kısıtı `kernel.apparmor_restrict_unprivileged_unconfined=1` (ve `..._userns=1`). Incus geliştiricisinin önerdiği çözüm bu sysctl'i 0 yapmak (lxc/incus#3251; Zabbly paketleri bunu artık otomatik yapıyor, Ubuntu'nun incus paketi yapmıyor). Host güvenlik ayarı olduğu için kullanıcı kendisi uyguladı; sonrasında sorun çözüldü.
 - Mac'teki proje klasörünün git kökü yanlışlıkla ev dizini (`/Users/gultekinqwe`) çıktı → proje klasöründe ayrı `git init` yapıldı.
@@ -95,5 +103,7 @@
 - **Yeniden başlayan Alpine cihazlar yeni IP aldı, `rg_approved` eski IP'de kaldı** → cihaz broker'a ulaşamadı. Çözüm: karar motorunun `on_ip_change` kancası + `protect` açılışında `sync`.
 - `sudo pkill -f "<desen>"` kendi ssh komut satırıyla da eşleşip oturumu öldürdü (iki kez). Daemon'u `tmux kill-session` ile kapat.
 
+- **Incus aynı MAC'i ikinci container'a vermiyor** (`MAC address already defined on another NIC`). R2/R3 senaryolarında rogue kendi MAC'iyle başlatılıp MAC içeriden değiştirilir (`ip link set eth0 address`); bu yüzden karantina kodu çalışma anındaki MAC'e de bakar. Yan etki: rogue önce kendi MAC'iyle `unknown_device` alarmı üretir.
+
 ### Sıradaki adım
-6.4 karantina (`containment/quarantine.py`: alarm aksiyonunu uygula, `contained_at`), ardından `decision/arp_guard.py` ve `abnormal_behavior`. Ara değerlendirme (19 Kasım) teslimlerinin hepsi hazır.
+`decision/arp_guard.py` (ARP spoofing → karantina) ve `abnormal_scan`/`abnormal_behavior` (→ blok); ardından 6.5 syslog, 6.6 dashboard (onay akışı), 6.7 sınıflandırıcılar.

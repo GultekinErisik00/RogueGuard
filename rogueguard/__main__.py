@@ -1,7 +1,7 @@
 """RogueGuard komut satırı: python -m rogueguard <discover|learn|protect|sync>.
 
-discover: sadece keşif (6.1). learn: öğrenme modu (6.2). protect: keşif + karar motoru (6.3,
-alarm yazar, karantina 6.4'te). sync: rg_approved/rg_block'u DB'den doldurur.
+discover: sadece keşif (6.1). learn: öğrenme modu (6.2). protect: keşif + karar motoru (6.3)
++ karantina/blok (6.4). sync: rg_approved/rg_block'u DB'den doldurur.
 Ham soket gerektiği için root ya da CAP_NET_RAW,CAP_NET_ADMIN ile çalışır.
 """
 import argparse
@@ -47,7 +47,12 @@ def main() -> None:
                 router.remove(router.approved_set, old_ip)
             router.add(router.approved_set, new_ip)
 
-        engine = DecisionEngine(cfg, on_ip_change=move_approved_ip)
+        on_alert = None
+        if cfg["containment"]["enabled"]:
+            from rogueguard.containment.actions import Containment
+            from rogueguard.containment.quarantine import Quarantine
+            on_alert = Containment(router, Quarantine(cfg)).apply
+        engine = DecisionEngine(cfg, on_ip_change=move_approved_ip, on_alert=on_alert)
         engine.sweep()
         disc = Discovery(cfg, on_observation=engine.on_observation)
         disc.start()

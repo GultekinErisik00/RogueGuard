@@ -138,3 +138,11 @@ def test_attack_map_matches_claude_md_table():
     assert ATTACKS["arp_spoofing"].attack_id == "T1557.002"
     assert ATTACKS["abnormal_scan"].action == "block"
     assert ATTACKS["abnormal_behavior"].attack_id is None
+
+
+def test_alert_hook_receives_new_alert_id(tmp_path):
+    engine, conn, _ = make_engine(tmp_path)
+    seen = []
+    engine._on_alert = lambda c, alert_id: seen.append(alert_id)
+    engine.on_observation(ROGUE_MAC, "10.20.0.150", "arp", {})
+    assert seen == [alerts(conn)[0]["id"]]

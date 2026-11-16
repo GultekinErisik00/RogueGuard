@@ -16,7 +16,7 @@ Siber Güvenlik dönem projesi: izole lab ağındaki IoT cihazlarını keşfet, 
 - [x] [[Benzerlik Tablosu]]
 - [x] [[ATT&CK Eşlemesi]]
 - [x] [[LLM Planı]]
-- [x] [[R1 İlk Ölçümler]]
+- [x] [[R1 İlk Ölçümler]] (R2 karantina ölçümü de burada)
 
 ## Rapor için
 - [[Karşılaşılan Zorluklar]]
@@ -28,5 +28,6 @@ Siber Güvenlik dönem projesi: izole lab ağındaki IoT cihazlarını keşfet, 
 | `rogueguard/discovery/` | sniffer (ARP/DHCP/mDNS), aktif ARP taraması, router_tap (MQTT yayınları), olaylar |
 | `rogueguard/fingerprint/` | dhcp, mdns, traffic, ports (nmap), profile, compare (benzerlik) |
 | `rogueguard/learn.py` | öğrenme modu → `devices` approved, `inventory.yaml`, `rg_approved` |
-| `rogueguard/containment/router.py` | rg-router nftables setleri |
+| `rogueguard/decision/` | karar motoru (alarm), ATT&CK eşlemesi |
+| `rogueguard/containment/` | router setleri, br-quar'a taşıma, alarm aksiyonunu uygulama |
 | `lab/` | cihaz profilleri, ajan, router/host yapılandırması |

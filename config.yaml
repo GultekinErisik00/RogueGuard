@@ -56,5 +56,9 @@ decision:
   match_min: 0.9                   # envanterdeki kendi kaydına benzerlik bunun altındaysa impersonation
   alert_cooldown: 300              # saniye: aynı (mac, tür) için tekrar alarm yazılmaz
 
+containment:
+  enabled: true                    # false: sadece alarm yaz, karantina/blok uygulama
+  quarantine_bridge: br-quar
+
 learn:
   inventory_path: inventory.yaml    # repo köküne göre; .gitignore'da (lab'a özel)

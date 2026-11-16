@@ -28,7 +28,19 @@ RogueGuard cihazı ilk **DHCP DISCOVER** paketinde görür (IP almadan önce). a
 ## Yanlış pozitif kontrolü (B1)
 Aynı oturumda 6 meşru cihaz yeniden başlatıldı: hepsi DHCP paketlerini yeniden gönderdi, **0 alarm**.
 
+## Ek: MAC kopyalama ve karantina (tek koşu)
+Kurban (cam-01) açıkken Fedora rogue içeriden cam-01'in MAC'ine geçti.
+
+| Adım | Süre (MAC değişiminden itibaren) |
+|---|---|
+| `impersonation` alarmı (T1036; farklı: hostname, option 55, vendor class) | 0.07 sn |
+| Rogue `br-quar` köprüsüne taşındı | 0.20 sn |
+
+- Rogue karantinada 10.20.1.130 aldı; broker'a ve kurbana ulaşamıyor.
+- cam-01 `br-iot`'ta, `approved`, broker'a ulaşmaya devam ediyor (yanlış engelleme yok).
+- Incus aynı MAC'i iki container'a vermediği için rogue önce kendi MAC'iyle bağlandı ve `unknown_device` alarmı da üretti.
+
 ## Sınırlar
 - 6 koşu, tek konfigürasyon; tam deney (3 konfigürasyon × 8 senaryo × 10 tekrar) Adım 7'de `experiments/run_scenarios.py` ile yapılacak.
-- Karantina süresi (ttc) henüz yok: 6.4 yazılmadı.
+- Karantina ölçümü tek koşu; `block` aksiyonu canlı denenmedi.
 - Koşular elle betikle alındı; ölçümler `results.csv`'de değil.
