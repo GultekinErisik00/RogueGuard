@@ -1,6 +1,7 @@
 """Karar motorunun yazdığı alarmın aksiyonunu uygular (alarm ≠ aksiyon):
 pending → dokunma (onaysız cihaz router'da zaten sadece DHCP/DNS alır);
-quarantine → container'ı br-quar'a taşı; block → IP'yi rg_block'a ekle.
+quarantine → container'ı br-quar'a taşı (ARP zehirlemesinde ardından doğru ARP bağlarını
+yeniden duyur); block → IP'yi rg_block'a ekle.
 Başarılı olursa alerts.contained_at yazılır (tespit→karantina süresi buradan ölçülür)."""
 import logging
 import sqlite3
@@ -15,8 +16,10 @@ log = logging.getLogger("rogueguard.containment")
 
 class Containment:
     def __init__(self, router: Router, quarantine: Quarantine,
-                 clock: Callable[[], float] = time.time) -> None:
+                 clock: Callable[[], float] = time.time,
+                 healer: Callable[[list[tuple[str, str]]], None] | None = None) -> None:
         self._router, self._quarantine, self._clock = router, quarantine, clock
+        self._healer = healer    # arp_heal.heal; testlerde sahte
 
     def apply(self, conn: sqlite3.Connection, alert_id: int) -> None:
         alert = conn.execute("SELECT * FROM alerts WHERE id=?", (alert_id,)).fetchone()
@@ -27,8 +30,18 @@ class Containment:
             done = self._block_device(conn, alert, device)
         else:
             return
-        if done:
-            conn.execute("UPDATE alerts SET contained_at=? WHERE id=?", (self._clock(), alert_id))
+        if not done:
+            return
+        conn.execute("UPDATE alerts SET contained_at=? WHERE id=?", (self._clock(), alert_id))
+        if alert["type"] == "arp_spoofing" and self._healer:
+            self._heal(conn)
+
+    def _heal(self, conn: sqlite3.Connection) -> None:
+        """Saldırgan ayrıldıktan sonra kurbanların zehirli ARP önbelleğini düzeltir."""
+        bindings = [(r["ip"], r["mac"]) for r in conn.execute(
+            "SELECT ip, mac FROM devices WHERE status='approved' AND ip IS NOT NULL")]
+        self._healer(bindings)
+        log.info("ARP iyileştirme: %d bağ yeniden duyuruldu", len(bindings))
 
     def _quarantine_device(self, conn, alert, device) -> bool:
         name = self._quarantine.isolate(alert["mac"], device["ip"] if device else None)

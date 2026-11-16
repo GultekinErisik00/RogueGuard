@@ -40,6 +40,18 @@ Kurban (cam-01) açıkken Fedora rogue içeriden cam-01'in MAC'ine geçti.
 - cam-01 `br-iot`'ta, `approved`, broker'a ulaşmaya devam ediyor (yanlış engelleme yok).
 - Incus aynı MAC'i iki container'a vermediği için rogue önce kendi MAC'iyle bağlandı ve `unknown_device` alarmı da üretti.
 
+## Ek: tarama ve ARP zehirleme (`full` profil)
+Rogue: Fedora 43 + nmap + dsniff, `br-iot` üzerinde; kurban cam-01.
+
+| Saldırı | Tespit | Aksiyon | Süre |
+|---|---|---|---|
+| Port taraması (`nmap -sT -p 1-300`) | `abnormal_scan` (T1046) | `rg_block` | tespit 0.30 sn, blok 0.42 sn (tarama başlangıcından) |
+| ARP zehirleme (`arpspoof -t kurban ağ_geçidi`), 3 koşu | `arp_spoofing` (T1557.002) | karantina + ARP iyileştirme | tespitten karantinaya 0.25–0.31 sn |
+
+- **İyileştirme bulgusu:** ilk denemede saldırgan karantinaya alındığı hâlde kurbanın ARP önbelleği zehirli kaldı ve kurban broker'a ulaşamadı. Doğru IP→MAC bağları yeniden duyurulunca kurban 1 sn içinde düzeldi. Yalnızca saldırganı ayırmak yetmiyor.
+- **arpwatch:** ARP zehirlemeyi `changed ethernet address` / `flip flop` olarak aynı saniyede gördü; fark tespit hızında değil, RogueGuard'ın saldırganı ayırıp kurbanı düzeltmesinde.
+- **Yanlış pozitif:** `full` profilde 6 meşru cihaz yeniden başlatılıp 3+ dakika izlendi, 0 alarm.
+
 ## Sınırlar
 - 6 koşu, tek konfigürasyon; tam deney (3 konfigürasyon × 8 senaryo × 10 tekrar) Adım 7'de `experiments/run_scenarios.py` ile yapılacak.
 - Karantina ölçümü tek koşu; `block` aksiyonu canlı denenmedi.

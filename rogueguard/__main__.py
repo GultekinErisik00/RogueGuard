@@ -51,10 +51,14 @@ def main() -> None:
         if cfg["containment"]["enabled"]:
             from rogueguard.containment.actions import Containment
             from rogueguard.containment.quarantine import Quarantine
-            on_alert = Containment(router, Quarantine(cfg)).apply
+            from functools import partial
+            from rogueguard.containment.arp_heal import heal
+            on_alert = Containment(router, Quarantine(cfg),
+                                   healer=partial(heal, cfg["network"]["iot_iface"])).apply
         engine = DecisionEngine(cfg, on_ip_change=move_approved_ip, on_alert=on_alert)
         engine.sweep()
-        disc = Discovery(cfg, on_observation=engine.on_observation)
+        disc = Discovery(cfg, on_observation=engine.on_observation,
+                         on_arp=engine.on_arp, on_syn=engine.on_syn)
         disc.start()
         disc.run_for(args.duration)
     elif args.cmd == "sync":

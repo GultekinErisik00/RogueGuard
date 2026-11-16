@@ -52,9 +52,16 @@ fingerprint:
     interval: 0.5
 
 decision:
-  detection_profile: fingerprint   # allowlist | fingerprint | full (full şimdilik = fingerprint)
+  detection_profile: full          # allowlist (MAC) | fingerprint (+DHCP izi) | full (+ARP, tarama, davranış)
   match_min: 0.9                   # envanterdeki kendi kaydına benzerlik bunun altındaysa impersonation
   alert_cooldown: 300              # saniye: aynı (mac, tür) için tekrar alarm yazılmaz
+
+  scan_window: 30                  # saniye: tarama sayım penceresi
+  scan_arp_targets: 10             # pencerede bu kadar farklı IP'ye ARP sorgusu → abnormal_scan
+  scan_syn_targets: 15             # pencerede bu kadar farklı ip:port'a TCP SYN → abnormal_scan
+  behavior_windows: 3              # K: bu kadar ardışık trafik penceresinde sapma → abnormal_behavior
+  rate_factor: 3                   # yayın üst sınırı = rate_factor × beklenen + rate_slack
+  rate_slack: 5
 
 containment:
   enabled: true                    # false: sadece alarm yaz, karantina/blok uygulama

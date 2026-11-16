@@ -57,6 +57,11 @@ class Sniffer:
         with self._lock:
             self._traffic.add_publish(ts, mac.lower(), src_ip, dst_ip, dport)
 
+    def record_destination(self, ts: float, mac: str, src_ip: str, dst_ip: str, dport: int) -> None:
+        """PortTap'ten gelen TCP SYN'i hedef olarak trafik penceresine ekler."""
+        with self._lock:
+            self._traffic.add(ts, mac.lower(), src_ip, dst_ip, dport, "tcp", 0)
+
     # --- paket işleme -----------------------------------------------------------
     def _handle(self, pkt: Any) -> None:
         if Ether not in pkt or pkt[Ether].src.lower() == self._own_mac:

@@ -103,6 +103,9 @@ def test_pending_device_ip_is_filled_in_later(tmp_path):
     row = conn.execute("SELECT ip, status FROM devices WHERE mac=?", (ROGUE_MAC,)).fetchone()
     assert tuple(row) == ("10.20.0.130", "pending")
     assert len(alerts(conn)) == 1
+    engine.on_observation(ROGUE_MAC, CAM["ip"], "arp", {})        # sahte ARP: onaylı IP'yi alamaz
+    assert conn.execute("SELECT ip FROM devices WHERE mac=?", (ROGUE_MAC,)).fetchone()[0] \
+        == "10.20.0.130"
 
 
 def test_allowlist_profile_only_checks_mac(tmp_path):

@@ -74,14 +74,14 @@
 - Bulgu: nmap, Debian cihazlarda 5355/tcp (LLMNR) açık gösterdi; port kümesi gerçek servisleri yansıtıyor.
 - **Çözüldü (yayın aralığı):** br-iot köprüsü cihaz→router unicast trafiğini host'a iletmiyordu, yayın aralığı boş kalıyordu. `discovery/router_tap.py` rg-router eth1'de `tcpdump` (BPF: MQTT PUBLISH) çalıştırıp yayınları trafik penceresine besliyor; son yayın zamanı pencereler arası tutulduğu için 300 sn'lik yazıcı da ölçülüyor. 660 sn'lik learn sonrası aralıklar: plug 10, temp 15, thermo 58, cam-01/02 ~40 (düzensiz), printer 326 sn. Meşru çiftler 0.07–0.18, cam ikizi 0.86; 15 test geçiyor.
 
-### 6.3 Karar motoru — "Bitti" koşulu geçti ✅ (16 Kasım)
+### 6.3 Karar motoru ✅ (16 Kasım)
 - `decision/attack_map.py` (§5 tablosu), `decision/engine.py`, `python -m rogueguard protect`, `config.yaml` `decision:` bölümü (`detection_profile`, `match_min: 0.9`, `alert_cooldown: 300`).
 - Motor olaylara değil **gözlemlere** bağlı (`Recorder(on_observation=...)`): `EventTracker` durumu bellekte tuttuğu için daemon yeniden başlayınca klonlanmış MAC'in ilk DHCP paketi `changed_device` üretmezdi.
 - Kurallar: envanterde olmayan MAC → `unknown_device` + `pending`; approved MAC'in DHCP parmak izi (hostname, option 55, vendor class) `compare.similarity` ile `match_min` altında → `impersonation`; DHCP ACK'te IP değişimi → alarm yok, `devices.ip` güncellenir ve `on_ip_change` kancası `rg_approved`'da eski IP'yi yenisiyle değiştirir (yakın zamanda impersonation alarmı olan MAC için taşınmaz). `protect` başlarken router setlerini DB'den eşitler ve `sweep()` ile önceden görülmüş bilinmeyen MAC'leri işaretler. Pending cihazın IP'si sonradan ARP/DHCP'den doldurulur.
 - 27 test geçiyor (12'si `tests/test_decision.py`).
 - **Kontrol B1 (canlı):** `protect` çalışırken 6 meşru cihaz yeniden başlatıldı; hepsi DHCP DISCOVER/REQUEST gönderdi, **0 alarm** (restart sonrası bekleme süresine gerek kalmadı: RENEW/REQUEST paketleri tüm option'ları taşıyor).
 - **Kontrol R1 (canlı):** `images:fedora/43` rogue container'ı br-iot'a bağlandı → `unknown_device` (T1200, pending), broker'a erişemiyor (TCP 1883 kapalı). 6 koşu (her biri yeni MAC): 6/6 yakalandı, tespit süresi 0.44–0.71 sn (medyan 0.48). arpwatch aynı cihazı `new station` olarak 6.3–9.2 sn'de gördü (medyan 8.8). Ayrıntı: `notes/R1 İlk Ölçümler.md`.
-- **Henüz yapılmadı (deneylerden önce):** `full` profilinin `abnormal_behavior` (K ardışık pencere) kısmı ve `arp_guard.py` (R4 için); `full` şimdilik `fingerprint` ile aynı. IP taşıma kancası birim testli, canlı olarak B2 senaryosunda (kiralama silme) denenecek.
+- `full` profilin ek tespitleri aşağıdaki bölümde.
 
 ### 6.4 Karantina ✅ (16 Kasım)
 - `containment/quarantine.py`: `incus list --format json` çıktısından MAC'i taşıyan, br-iot'ta çalışan container'ı bulur, `incus config device set <ad> eth0 parent=br-quar` ile taşır. MAC hem Incus yapılandırmasından hem çalışma anındaki arayüzden okunur (saldırgan MAC'i içeriden değiştirir). Aynı MAC'li iki container varsa IP'si envanterdekiyle uyuşmayan, o da ayırt etmezse en son oluşturulan seçilir.
@@ -90,6 +90,19 @@
 - 37 test geçiyor (9'u `tests/test_containment.py`).
 - **Kontrol (canlı, kurban açık):** Fedora rogue br-iot'a bağlandı (`unknown_device`), sonra içeriden cam-01'in MAC'ine geçti → `impersonation` (T1036; farklı: hostname, opt55, vendor_class) → rogue-r2 br-quar'a taşındı. MAC değişiminden itibaren tespit 0.07 sn, karantina 0.20 sn. Rogue karantinada 10.20.1.130 aldı, broker'a ve kurbana ulaşamıyor; cam-01 br-iot'ta, `approved`, broker'a ulaşıyor.
 - **Canlı denenmedi:** `block` yolu (onu tetikleyen `abnormal_scan`/`abnormal_behavior` tespiti henüz yok; birim testli).
+
+### `full` profil: ARP zehirleme, tarama, davranış sapması ✅ (16 Kasım)
+- **Görünürlük:** host'un br-iot arayüzü cihazlar arası unicast çerçeveleri görmez; ARP zehirleme ve port taraması böyle çerçevelerdir. `discovery/port_tap.py` köprünün port arayüzlerini (veth; SPAN portu karşılığı) dinler: ARP ve TCP SYN, sadece cihazdan gelen yön. Yeni container yeni port açtığı için üyelik 2 sn'de bir yenilenir. SYN hedefleri trafik penceresine de eklenir (öğrenme ve davranış için).
+- `decision/arp_guard.py`: ARP'de bir IP'yi, envanterdeki sahibinden farklı bir MAC sahipleniyorsa `arp_spoofing` (T1557.002) → karantina. `decision/scan.py`: 30 sn'de ≥10 farklı IP'ye ARP sorgusu ya da ≥15 farklı ip:port'a SYN → `abnormal_scan` (T1046) → `rg_block`. `decision/behavior.py`: onaylı cihaz K=3 ardışık pencerede envanter dışı hedefe bağlanır ya da öğrenilen hızın çok üstünde yayın yaparsa `abnormal_behavior` → `rg_block`; sessizlik ve tek pencerelik sapma sayılmaz. Hepsi sadece `detection_profile: full` iken çalışır; eşikler `config.yaml` `decision:` altında.
+- `containment/arp_heal.py`: ARP zehirlemesinde karantinadan sonra envanterdeki doğru IP→MAC bağları broadcast ARP ile yeniden duyurulur. İlk canlı denemede saldırgan karantinaya alındığı hâlde kurbanın önbelleği zehirli kaldı ve kurban broker'a ulaşamadı (kendiliğinden düzelmesi onlarca saniye sürdü); iyileştirmeyle 1 sn içinde düzeliyor.
+- Yanlış pozitif önlemleri: kira yeniden dağıtılınca eski IP bağı temizlenir (yeni sahibi zehirleyici sanılmasın); pending cihazın kaydına onaylı bir cihazın IP'si yazılmaz (sahte ARP ile kayıt kirlenmesin); router (infrastructure) tarama sayımına girmez.
+- 45 test geçiyor (`tests/test_full_profile.py` 8 yeni).
+- **Kontrol (canlı, `full` profil):**
+  - Yanlış pozitif: 6 meşru cihaz yeniden başlatıldı, 3+ dk izlendi → **0 alarm**.
+  - Port taraması (`nmap -sT -p 1-300 <cam-01>`, rogue'dan): `abnormal_scan` 0.30 sn'de, `rg_block` 0.42 sn'de.
+  - ARP zehirleme (`arpspoof -t <cam-01> <ağ geçidi>`, 3 koşu): `arp_spoofing` → karantina; tespitten karantinaya 0.25–0.31 sn; iyileştirme sonrası kurbanın ARP kaydı gerçek router MAC'i, broker'a ulaşıyor. arpwatch aynı olayı `changed ethernet address` / `flip flop` olarak aynı saniyede gördü (ama engellemedi).
+- **Canlı denenmedi:** `abnormal_behavior` (onaylı cihazın ele geçirilmesi senaryosu Adım 7'de) ve "restart sonrası bekleme süresi" (canlı B1'lerde yanlış alarm çıkmadığı için eklenmedi).
+- Bilinen sınır: `rg_block` router'dan geçen trafiği keser, aynı köprü içindeki taramayı durdurmaz (CLAUDE.md §5 aksiyonu böyle tanımlıyor).
 
 ### Karşılaşılan sorunlar
 - **systemd'li container'lar açılışta takılıyor (Ubuntu 26.10 host).** Debian 13 container'ında journald/networkd/resolved `(sd-mkuser...)` adımında asılı kalıyor, `eth0` IP almıyor; host dmesg'de `incus-<ad>` profili için AppArmor ptrace DENIED satırları. Neden: Ubuntu'ya özgü AppArmor kısıtı `kernel.apparmor_restrict_unprivileged_unconfined=1` (ve `..._userns=1`). Incus geliştiricisinin önerdiği çözüm bu sysctl'i 0 yapmak (lxc/incus#3251; Zabbly paketleri bunu artık otomatik yapıyor, Ubuntu'nun incus paketi yapmıyor). Host güvenlik ayarı olduğu için kullanıcı kendisi uyguladı; sonrasında sorun çözüldü.
@@ -106,4 +119,4 @@
 - **Incus aynı MAC'i ikinci container'a vermiyor** (`MAC address already defined on another NIC`). R2/R3 senaryolarında rogue kendi MAC'iyle başlatılıp MAC içeriden değiştirilir (`ip link set eth0 address`); bu yüzden karantina kodu çalışma anındaki MAC'e de bakar. Yan etki: rogue önce kendi MAC'iyle `unknown_device` alarmı üretir.
 
 ### Sıradaki adım
-`decision/arp_guard.py` (ARP spoofing → karantina) ve `abnormal_scan`/`abnormal_behavior` (→ blok); ardından 6.5 syslog, 6.6 dashboard (onay akışı), 6.7 sınıflandırıcılar.
+6.5 syslog (Wazuh kapalıyken hata vermemeli), 6.6 dashboard (onay akışı: `approvals` → daemon), 6.7 sınıflandırıcılar (Groq anahtarı `.env`'de gerekli); sonra Adım 7 deney betikleri ve Adım 4 Wazuh.

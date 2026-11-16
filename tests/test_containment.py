@@ -109,8 +109,13 @@ def test_impersonation_quarantines_container_but_leaves_victim_approved(tmp_path
 def test_arp_spoofing_quarantines_and_revokes_approval(tmp_path):
     conn, aid = setup(tmp_path, "arp_spoofing", "quarantine")
     router = FakeRouter({"10.20.0.111"})
-    Containment(router, FakeQuarantine("cam-01"), clock=lambda: 5.0).apply(conn, aid)
+    conn.execute("INSERT INTO devices (mac, ip, status) VALUES ('10:66:6a:01:0d:3f', "
+                 "'10.20.0.1', 'approved')")
+    healed = []
+    Containment(router, FakeQuarantine("cam-01"), clock=lambda: 5.0,
+                healer=healed.append).apply(conn, aid)
     assert status(conn) == "quarantined" and router.sets["rg_approved"] == set()
+    assert healed == [[("10.20.0.1", "10:66:6a:01:0d:3f")]]     # karantinadaki cihaz duyurulmaz
 
 
 def test_block_adds_ip_to_block_set_and_marks_device(tmp_path):
