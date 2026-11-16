@@ -12,11 +12,11 @@ Siber Güvenlik dönem projesi: izole lab ağındaki IoT cihazlarını keşfet, 
 ## Ara değerlendirme (19 Kasım 2026) teslimleri
 - [x] Adım 1–3: VM, köprüler, router, broker, 6 cihaz
 - [x] 6.1 Keşif, 6.2 Öğrenme modu
-- [ ] 6.3 Karar motoru
+- [x] 6.3 Karar motoru (unknown_device, impersonation)
 - [x] [[Benzerlik Tablosu]]
 - [x] [[ATT&CK Eşlemesi]]
 - [x] [[LLM Planı]]
-- [ ] R1 için ilk ölçümler
+- [x] [[R1 İlk Ölçümler]]
 
 ## Rapor için
 - [[Karşılaşılan Zorluklar]]

@@ -74,13 +74,14 @@
 - Bulgu: nmap, Debian cihazlarda 5355/tcp (LLMNR) açık gösterdi; port kümesi gerçek servisleri yansıtıyor.
 - **Çözüldü (yayın aralığı):** br-iot köprüsü cihaz→router unicast trafiğini host'a iletmiyordu, yayın aralığı boş kalıyordu. `discovery/router_tap.py` rg-router eth1'de `tcpdump` (BPF: MQTT PUBLISH) çalıştırıp yayınları trafik penceresine besliyor; son yayın zamanı pencereler arası tutulduğu için 300 sn'lik yazıcı da ölçülüyor. 660 sn'lik learn sonrası aralıklar: plug 10, temp 15, thermo 58, cam-01/02 ~40 (düzensiz), printer 326 sn. Meşru çiftler 0.07–0.18, cam ikizi 0.86; 15 test geçiyor.
 
-### 6.3 Karar motoru (devam ediyor — 16 Kasım)
+### 6.3 Karar motoru — "Bitti" koşulu geçti ✅ (16 Kasım)
 - `decision/attack_map.py` (§5 tablosu), `decision/engine.py`, `python -m rogueguard protect`, `config.yaml` `decision:` bölümü (`detection_profile`, `match_min: 0.9`, `alert_cooldown: 300`).
 - Motor olaylara değil **gözlemlere** bağlı (`Recorder(on_observation=...)`): `EventTracker` durumu bellekte tuttuğu için daemon yeniden başlayınca klonlanmış MAC'in ilk DHCP paketi `changed_device` üretmezdi.
-- Kurallar: envanterde olmayan MAC → `unknown_device` + `pending`; approved MAC'in DHCP parmak izi (hostname, option 55, vendor class) `compare.similarity` ile `match_min` altında → `impersonation`; DHCP ACK'te IP değişimi → sadece `devices.ip` güncellenir. `protect` başlarken `sweep()` keşifte görülmüş ama envanterde olmayan MAC'leri de işaretler. Sensörün kendi br-iot IP'si (10.20.0.2) yok sayılır.
-- 25 test geçiyor (10'u yeni, `tests/test_decision.py`). Testler `.venv/bin/python -m pytest` ile çalışır (`pytest` tek başına `rogueguard` paketini bulamıyor).
-- **Henüz yapılmadı:** `full` profilinin `abnormal_behavior` (K ardışık pencere) kısmı, restart sonrası bekleme süresi, IP değişince router `rg_approved` güncellemesi (6.4), `arp_guard.py`. `full` şimdilik `fingerprint` ile aynı.
-- **Bekleyen kontrol:** canlı R1 — rogue Fedora container'ı br-iot'a bağlanınca `unknown_device` alarmı ve `pending`; 6 meşru cihazın restart'ında 0 alarm.
+- Kurallar: envanterde olmayan MAC → `unknown_device` + `pending`; approved MAC'in DHCP parmak izi (hostname, option 55, vendor class) `compare.similarity` ile `match_min` altında → `impersonation`; DHCP ACK'te IP değişimi → alarm yok, `devices.ip` güncellenir ve `on_ip_change` kancası `rg_approved`'da eski IP'yi yenisiyle değiştirir (yakın zamanda impersonation alarmı olan MAC için taşınmaz). `protect` başlarken router setlerini DB'den eşitler ve `sweep()` ile önceden görülmüş bilinmeyen MAC'leri işaretler. Pending cihazın IP'si sonradan ARP/DHCP'den doldurulur.
+- 27 test geçiyor (12'si `tests/test_decision.py`).
+- **Kontrol B1 (canlı):** `protect` çalışırken 6 meşru cihaz yeniden başlatıldı; hepsi DHCP DISCOVER/REQUEST gönderdi, **0 alarm** (restart sonrası bekleme süresine gerek kalmadı: RENEW/REQUEST paketleri tüm option'ları taşıyor).
+- **Kontrol R1 (canlı):** `images:fedora/43` rogue container'ı br-iot'a bağlandı → `unknown_device` (T1200, pending), broker'a erişemiyor (TCP 1883 kapalı). 6 koşu (her biri yeni MAC): 6/6 yakalandı, tespit süresi 0.44–0.71 sn (medyan 0.48). arpwatch aynı cihazı `new station` olarak 6.3–9.2 sn'de gördü (medyan 8.8). Ayrıntı: `notes/R1 İlk Ölçümler.md`.
+- **Henüz yapılmadı (deneylerden önce):** `full` profilinin `abnormal_behavior` (K ardışık pencere) kısmı ve `arp_guard.py` (R4 için); `full` şimdilik `fingerprint` ile aynı. IP taşıma kancası birim testli, canlı olarak B2 senaryosunda (kiralama silme) denenecek.
 
 ### Karşılaşılan sorunlar
 - **systemd'li container'lar açılışta takılıyor (Ubuntu 26.10 host).** Debian 13 container'ında journald/networkd/resolved `(sd-mkuser...)` adımında asılı kalıyor, `eth0` IP almıyor; host dmesg'de `incus-<ad>` profili için AppArmor ptrace DENIED satırları. Neden: Ubuntu'ya özgü AppArmor kısıtı `kernel.apparmor_restrict_unprivileged_unconfined=1` (ve `..._userns=1`). Incus geliştiricisinin önerdiği çözüm bu sysctl'i 0 yapmak (lxc/incus#3251; Zabbly paketleri bunu artık otomatik yapıyor, Ubuntu'nun incus paketi yapmıyor). Host güvenlik ayarı olduğu için kullanıcı kendisi uyguladı; sonrasında sorun çözüldü.
@@ -90,5 +91,9 @@
 - **rg-router'da dnsmasq upstream'i.** Container'ın `/etc/resolv.conf`'u systemd-resolved stub'ı (127.0.0.53). `resolv-file=/run/systemd/resolve/resolv.conf` eklendi → upstream incusbr0 DNS'i (10.160.244.1).
 - **pip kurulumu 8+ dk sessizce takıldı** (`-q` ile tüm paketler tek seferde, Python 3.14). Çekirdek paketler ve streamlit/pandas/openai ayrı ayrı kurulunca birkaç dakikada bitti.
 
+- **VM askıya alınıp devam ettirilince `incusbr0` IPv4 adresini kaybetti** (link down → sadece IPv6LL kaldı); rg-router'ın incusbr0 ayağı da IPv4'süz kaldı, onaylı cihazların interneti kesildi. Çözüm: `sudo systemctl restart incus` (container'lar durmaz) + `incus exec rg-router -- networkctl reconfigure eth0`. br-iot/br-svc etkilenmedi.
+- **Yeniden başlayan Alpine cihazlar yeni IP aldı, `rg_approved` eski IP'de kaldı** → cihaz broker'a ulaşamadı. Çözüm: karar motorunun `on_ip_change` kancası + `protect` açılışında `sync`.
+- `sudo pkill -f "<desen>"` kendi ssh komut satırıyla da eşleşip oturumu öldürdü (iki kez). Daemon'u `tmux kill-session` ile kapat.
+
 ### Sıradaki adım
-6.3 karar motoru (`decision/engine.py`: özellik skoru + `detection_profile` allowlist/fingerprint/full, `unknown_device` → pending, yanlış pozitif önlemleri). 
+6.4 karantina (`containment/quarantine.py`: alarm aksiyonunu uygula, `contained_at`), ardından `decision/arp_guard.py` ve `abnormal_behavior`. Ara değerlendirme (19 Kasım) teslimlerinin hepsi hazır.

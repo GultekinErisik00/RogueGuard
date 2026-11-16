@@ -3,7 +3,9 @@
 - Envanterde olmayan MAC → `unknown_device` alarmı, cihaz `pending` yazılır (engelleme yok).
 - Envanterdeki (approved) MAC'in DHCP parmak izi (hostname, option 55, vendor class) kendi
   kaydından sapıyorsa → `impersonation`. Skor `fingerprint/compare.py` ile hesaplanır.
-- DHCP ACK'te IP değiştiyse cihazın IP'si güncellenir, alarm üretilmez (meşru IP değişimi).
+- DHCP ACK'te IP değiştiyse cihazın IP'si güncellenir, alarm üretilmez (meşru IP değişimi);
+  `on_ip_change` kancası router'daki rg_approved setini yeni IP'ye taşır. MAC için yakın zamanda
+  impersonation alarmı varsa IP taşınmaz (taklitçi onaylı sete girmesin).
 
 `detection_profile`: allowlist (sadece MAC) | fingerprint (MAC + DHCP parmak izi) | full.
 `full` şimdilik `fingerprint` ile aynıdır; abnormal_behavior (K ardışık pencere) sonra eklenecek.
@@ -24,6 +26,8 @@ log = logging.getLogger("rogueguard.decision")
 
 PROFILES = ("allowlist", "fingerprint", "full")
 FP_MSG_TYPES = {"discover", "request"}
+IP_SOURCES = {"arp", "dhcp"}                             # IP sadece bunlardan güvenilir okunur
+IpChangeHook = Callable[[str, str | None, str], None]    # (mac, eski_ip, yeni_ip)
 DHCP_FEATURES = ("hostname", "opt55", "vendor_class")   # DHCP paketinden okunan özellikler
 
 
@@ -48,7 +52,8 @@ def observed_profile(inventory: dict[str, Any], dhcp: dict[str, Any]) -> dict[st
 
 class DecisionEngine:
     def __init__(self, cfg: dict[str, Any], conn: sqlite3.Connection | None = None,
-                 clock: Callable[[], float] = time.time) -> None:
+                 clock: Callable[[], float] = time.time,
+                 on_ip_change: IpChangeHook | None = None) -> None:
         dcfg = cfg["decision"]
         if dcfg["detection_profile"] not in PROFILES:
             raise ValueError(f"detection_profile {dcfg['detection_profile']!r}, "
@@ -62,6 +67,7 @@ class DecisionEngine:
         self._injected = conn
         self._local = threading.local()   # SQLite bağlantısı thread'ler arası paylaşılamaz
         self._clock = clock
+        self._on_ip_change = on_ip_change
 
     def _conn(self) -> sqlite3.Connection:
         if self._injected is not None:
@@ -79,14 +85,29 @@ class DecisionEngine:
         if row is None:
             self._raise_unknown(conn, mac, ip, data)
             return
+        if row["status"] == "pending" and ip and source in IP_SOURCES and ip != row["ip"]:
+            conn.execute("UPDATE devices SET ip=?, last_seen=? WHERE mac=?",
+                         (ip, self._clock(), mac))   # dashboard onay ekranı IP'yi göstersin
         if row["status"] != "approved" or row["device_type"] == "infrastructure":
             return
         if source == "dhcp" and data.get("msg_type") == "ack" and ip and ip != row["ip"]:
-            conn.execute("UPDATE devices SET ip=?, last_seen=? WHERE mac=?",
-                         (ip, self._clock(), mac))
+            self._move_ip(conn, row, ip)
         elif (source == "dhcp" and data.get("msg_type") in FP_MSG_TYPES
               and self._profile != "allowlist"):
             self._check_dhcp_fingerprint(conn, row, ip, data)
+
+    def _move_ip(self, conn: sqlite3.Connection, row: sqlite3.Row, new_ip: str) -> None:
+        suspect = conn.execute("SELECT 1 FROM alerts WHERE mac=? AND type='impersonation' "
+                               "AND ts > ?", (row["mac"], self._clock() - self._cooldown)).fetchone()
+        if suspect:
+            log.warning("%s için IP %s onaylanmadı: yakın zamanda impersonation alarmı var",
+                        row["mac"], new_ip)
+            return
+        conn.execute("UPDATE devices SET ip=?, last_seen=? WHERE mac=?",
+                     (new_ip, self._clock(), row["mac"]))
+        log.info("IP değişti %s: %s → %s", row["mac"], row["ip"], new_ip)
+        if self._on_ip_change:
+            self._on_ip_change(row["mac"], row["ip"], new_ip)
 
     def sweep(self) -> None:
         """protect başlamadan önce keşifte görülmüş ama envanterde olmayan MAC'leri işaretler."""

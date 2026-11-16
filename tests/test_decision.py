@@ -83,6 +83,28 @@ def test_dhcp_ack_with_new_ip_updates_device_without_alert(tmp_path):
     assert ip == "10.20.0.177"
 
 
+def test_ip_change_hook_moves_approved_ip_but_not_after_impersonation(tmp_path):
+    engine, conn, _ = make_engine(tmp_path)
+    moves = []
+    engine._on_ip_change = lambda mac, old, new: moves.append((old, new))
+    engine.on_observation(CAM["mac"], "10.20.0.112", "dhcp", {"msg_type": "ack"})
+    assert moves == [("10.20.0.111", "10.20.0.112")]
+    engine.on_observation(CAM["mac"], None, "dhcp", dict(REQUEST, hostname="fedora"))
+    engine.on_observation(CAM["mac"], "10.20.0.150", "dhcp", {"msg_type": "ack"})
+    assert len(moves) == 1                       # taklitçinin IP'si onaylı sete taşınmaz
+    assert conn.execute("SELECT ip FROM devices WHERE mac=?", (CAM["mac"],)).fetchone()[0] \
+        == "10.20.0.112"
+
+
+def test_pending_device_ip_is_filled_in_later(tmp_path):
+    engine, conn, _ = make_engine(tmp_path)
+    engine.on_observation(ROGUE_MAC, None, "dhcp", {"msg_type": "discover", "hostname": "r1"})
+    engine.on_observation(ROGUE_MAC, "10.20.0.130", "arp", {})
+    row = conn.execute("SELECT ip, status FROM devices WHERE mac=?", (ROGUE_MAC,)).fetchone()
+    assert tuple(row) == ("10.20.0.130", "pending")
+    assert len(alerts(conn)) == 1
+
+
 def test_allowlist_profile_only_checks_mac(tmp_path):
     engine, conn, _ = make_engine(tmp_path, profile="allowlist")
     engine.on_observation(CAM["mac"], "10.20.0.150", "dhcp", dict(REQUEST, hostname="evil"))

@@ -35,9 +35,19 @@ def main() -> None:
         from rogueguard.learn import learn
         learn(cfg, args.duration)
     elif args.cmd == "protect":
+        from rogueguard import db
+        from rogueguard.containment.router import Router
         from rogueguard.decision.engine import DecisionEngine
         from rogueguard.discovery.runner import Discovery
-        engine = DecisionEngine(cfg)
+        router = Router(cfg)
+        _sync_router(router, db.connect(cfg["database"]["path"]))   # router setleri boşalmış olabilir
+
+        def move_approved_ip(mac: str, old_ip: str | None, new_ip: str) -> None:
+            if old_ip and old_ip in router.members(router.approved_set):
+                router.remove(router.approved_set, old_ip)
+            router.add(router.approved_set, new_ip)
+
+        engine = DecisionEngine(cfg, on_ip_change=move_approved_ip)
         engine.sweep()
         disc = Discovery(cfg, on_observation=engine.on_observation)
         disc.start()
@@ -45,11 +55,16 @@ def main() -> None:
     elif args.cmd == "sync":
         from rogueguard import db
         from rogueguard.containment.router import Router
-        conn = db.connect(cfg["database"]["path"])
-        ips = lambda status: [r["ip"] for r in conn.execute(
+        _sync_router(Router(cfg), db.connect(cfg["database"]["path"]))
+
+
+def _sync_router(router, conn) -> None:
+    """rg_approved / rg_block setlerini devices tablosundaki duruma eşitler."""
+    def ips(status: str) -> list[str]:
+        return [r["ip"] for r in conn.execute(
             "SELECT ip FROM devices WHERE status=? AND ip IS NOT NULL "
             "AND COALESCE(device_type,'') != 'infrastructure'", (status,))]
-        Router(cfg).sync(ips("approved"), ips("blocked"))
+    router.sync(ips("approved"), ips("blocked"))
 
 
 if __name__ == "__main__":
