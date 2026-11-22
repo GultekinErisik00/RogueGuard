@@ -19,6 +19,7 @@ Siber Güvenlik dönem projesi: izole lab ağındaki IoT cihazlarını keşfet, 
 - [x] [[R1 İlk Ölçümler]] (R2 karantina ölçümü de burada)
 
 ## Rapor için
+- [[İlerleme Raporu]] — tek sayfalık özet (22 Kasım)
 - [[Karşılaşılan Zorluklar]]
 - Hocanın geri bildirimi: cihazlar farklı olmalı → [[Benzerlik Tablosu]]; Enterprise matrisi → [[ATT&CK Eşlemesi]]; LLM → [[LLM Planı]]
 
