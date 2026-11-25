@@ -47,20 +47,31 @@ def main() -> None:
                 router.remove(router.approved_set, old_ip)
             router.add(router.approved_set, new_ip)
 
-        on_alert = None
+        from rogueguard.alerting.syslog import SyslogForwarder
+        alert_hooks = []
         if cfg["containment"]["enabled"]:
             from rogueguard.containment.actions import Containment
             from rogueguard.containment.quarantine import Quarantine
             from functools import partial
             from rogueguard.containment.arp_heal import heal
-            on_alert = Containment(router, Quarantine(cfg),
-                                   healer=partial(heal, cfg["network"]["iot_iface"])).apply
+            alert_hooks.append(Containment(router, Quarantine(cfg),
+                                           healer=partial(heal, cfg["network"]["iot_iface"])).apply)
+        syslog = SyslogForwarder(cfg)
+        alert_hooks.append(syslog.on_alert)
+
+        def on_alert(conn, alert_id: int) -> None:
+            for hook in alert_hooks:
+                hook(conn, alert_id)
+
         engine = DecisionEngine(cfg, on_ip_change=move_approved_ip, on_alert=on_alert)
         engine.sweep()
         disc = Discovery(cfg, on_observation=engine.on_observation,
                          on_arp=engine.on_arp, on_syn=engine.on_syn)
         disc.start()
-        disc.run_for(args.duration)
+        try:
+            disc.run_for(args.duration)
+        finally:
+            syslog.close()
     elif args.cmd == "sync":
         from rogueguard import db
         from rogueguard.containment.router import Router

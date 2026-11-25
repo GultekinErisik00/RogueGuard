@@ -118,5 +118,11 @@
 
 - **Incus aynı MAC'i ikinci container'a vermiyor** (`MAC address already defined on another NIC`). R2/R3 senaryolarında rogue kendi MAC'iyle başlatılıp MAC içeriden değiştirilir (`ip link set eth0 address`); bu yüzden karantina kodu çalışma anındaki MAC'e de bakar. Yan etki: rogue önce kendi MAC'iyle `unknown_device` alarmı üretir.
 
+### 6.5 Alarm iletimi ✅ (25 Kasım)
+- `rogueguard/alerting/syslog.py`: `SyslogForwarder` + `_QuietSysLogHandler` (UDP 514, format `'%(asctime)s rogueguard-lab rogueguard: %(message)s'`, datefmt `'%b %d %H:%M:%S'`, JSON yükü `type, mac, ip, severity, attack_id, action, reason`). `wazuh_ip` boşsa veya hedef erişilemezse hata vermeden sessizce geçer.
+- `rogueguard/__main__.py`: `protect` modunda `on_alert` kancası önce karantina/blok, ardından syslog iletimi çalıştıracak şekilde bağlandı; kapanışta `syslog.close()`.
+- 50 test geçiyor (`tests/test_alerting.py` 5 yeni: JSON alanları, `wazuh_ip: null` no-op, syslog formatı, yerel UDP soketine DB alarmından gerçek gönderim, soket hatası yutma).
+- **Kontrol (canlı):** `wazuh_ip: null` iken `protect --duration 3` hatasız çalıştı ve temiz kapandı.
+
 ### Sıradaki adım
-6.5 syslog (Wazuh kapalıyken hata vermemeli), 6.6 dashboard (onay akışı: `approvals` → daemon), 6.7 sınıflandırıcılar (Groq anahtarı `.env`'de gerekli); sonra Adım 7 deney betikleri ve Adım 4 Wazuh.
+6.6 dashboard (Streamlit + onay akışı: `approvals` → daemon), 6.7 sınıflandırıcılar (kural + Groq LLM, `.env` anahtarı); sonra Adım 4 Wazuh ve Adım 7 deney betikleri.
