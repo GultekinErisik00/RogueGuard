@@ -14,6 +14,7 @@ if str(ROOT) not in sys.path:
 
 from dashboard import data as dash_data
 from rogueguard import config, db
+from rogueguard.classify.llm import LLMClassifier
 
 
 st.set_page_config(page_title="RogueGuard", layout="wide")
@@ -32,9 +33,11 @@ def _conn():
 
 @st.fragment(run_every="5s")
 def render_live_tabs() -> None:
+    cfg = config.load()
+    llm = LLMClassifier(cfg)
     conn = _conn()
     try:
-        devices = dash_data.load_devices(conn)
+        devices = dash_data.load_devices(conn, llm=llm)
         pending = dash_data.load_pending(conn)
         alerts = dash_data.load_alerts(conn)
 
@@ -85,6 +88,14 @@ def render_live_tabs() -> None:
                 df["first_seen"] = df["first_seen"].map(_fmt_ts)
                 df["last_seen"] = df["last_seen"].map(_fmt_ts)
                 st.dataframe(df, width="stretch", hide_index=True)
+                if llm.enabled and st.button("LLM ile Tahmin Et (Groq — Bilgi Amaçlı)"):
+                    rows = conn.execute(
+                        "SELECT mac, hostname, vendor, dhcp_fp, ports, mdns, publish_interval, "
+                        "device_type FROM devices WHERE COALESCE(device_type,'') != 'infrastructure'"
+                    ).fetchall()
+                    for r in rows:
+                        llm.classify(dash_data.device_profile_from_row(r))
+                    st.rerun()
             else:
                 st.info("Henüz kayıtlı cihaz yok.")
 

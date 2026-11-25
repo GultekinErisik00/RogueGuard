@@ -131,5 +131,13 @@
 - 54 test geçiyor (`tests/test_approvals.py` 4 yeni).
 - **Kontrol (canlı):** Streamlit `http://192.168.23.136:8501/_stcore/health` Mac'ten `ok`; `protect` açıkken root olmadan `submit_approval` → `approve` (`approved` + `rg_approved`) ve `reject` (`blocked` + `rg_block`) canlı doğrulandı (`LIVE_APPROVAL_FLOW_OK`).
 
+### 6.7 Cihaz Türü Sınıflandırma (Kural + Groq LLM) ✅ (25 Kasım)
+- `rogueguard/classify/rules.py`: OUI, mDNS, port, hostname/vendor_class/banner anahtar kelimeleri ve sessiz+MQTT yayın aralığı kurallarıyla `{camera, printer, smart_plug, sensor, thermostat, unknown}` tahmini.
+- `rogueguard/classify/llm.py`: Groq OpenAI-uyumlu API (`https://api.groq.com/openai/v1`, model `openai/gpt-oss-20b`, `temperature=0`, JSON `{label, confidence, reason}`), parmak izi SHA-256 hash önbelleği (`data/llm_cache.json`), 429'da `retry-after` bekleme, hibrit yardımcı (`classify_hybrid`). `GROQ_API_KEY` yalnızca `.env` içinde; LLM karar motoruna (`decision/`) asla girmez.
+- `dashboard/data.py` & `dashboard/app.py`: Cihazlar tablosunda Kural Tahmini + LLM Tahmini (Bilgi Amaçlı) sütunları ve isteğe bağlı "LLM ile Tahmin Et (Groq)" butonu.
+- 61 test geçiyor (`tests/test_classify.py` 7 yeni).
+- **Kontrol (canlı, Groq `openai/gpt-oss-20b`):** 6 meşru cihazda kurallar 6/6, LLM 6/6 doğru etiketledi (gecikme 0.40–0.71 sn), ikinci sorguda önbellek isabeti doğrulandı (`LIVE_GROQ_AND_CACHE_OK`).
+- Not: Groq konsolunda yeni hesaplarda modeller hem organizasyon (`settings/limits`) hem proje (`settings/project/limits`) seviyesinde ayrı ayrı etkinleştirilmek zorunda.
+
 ### Sıradaki adım
-6.7 sınıflandırıcılar (`rogueguard/classify/rules.py` + `llm.py`, Groq `.env` anahtarı); sonra Adım 4 Wazuh ve Adım 7 deney betikleri.
+Adım 4 Wazuh SIEM (`wazuh` container + `lab/wazuh/` decoder/rule + syslog canlı testi) ve Adım 7 deney betikleri (`run_scenarios.py`, `metrics.py`, LLM/prompt-injection deneyi).

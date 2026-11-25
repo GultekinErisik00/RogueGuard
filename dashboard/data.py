@@ -6,10 +6,30 @@ import sqlite3
 import time
 from typing import Any
 
+from rogueguard.classify import rules
+from rogueguard.classify.llm import LLMClassifier
 
-def load_devices(conn: sqlite3.Connection) -> list[dict[str, Any]]:
+
+def device_profile_from_row(r: sqlite3.Row) -> dict[str, Any]:
+    """`devices` satırından sınıflandırıcıların beklediği profil sözlüğünü çıkarır."""
+    dhcp_fp = json.loads(r["dhcp_fp"] or "{}")
+    ports = json.loads(r["ports"] or "[]")
+    return {
+        "mac": r["mac"],
+        "oui": r["vendor"] or r["mac"][:8],
+        "hostname": r["hostname"],
+        "opt55": dhcp_fp.get("opt55"),
+        "vendor_class": dhcp_fp.get("vendor_class"),
+        "ports": ports,
+        "mdns": json.loads(r["mdns"] or "[]"),
+        "interval": r["publish_interval"],
+    }
+
+
+def load_devices(conn: sqlite3.Connection,
+                 llm: LLMClassifier | None = None) -> list[dict[str, Any]]:
     rows = conn.execute(
-        "SELECT mac, ip, hostname, vendor, ports, mdns, publish_interval, device_type, "
+        "SELECT mac, ip, hostname, vendor, dhcp_fp, ports, mdns, publish_interval, device_type, "
         "status, first_seen, last_seen FROM devices ORDER BY status, hostname, mac"
     ).fetchall()
     out = []
@@ -17,12 +37,20 @@ def load_devices(conn: sqlite3.Connection) -> list[dict[str, Any]]:
         ports = json.loads(r["ports"] or "[]")
         port_list = [f'{p["port"]}/{p.get("proto", "tcp")}' for p in ports if isinstance(p, dict)]
         mdns_list = json.loads(r["mdns"] or "[]")
+        prof = device_profile_from_row(r)
+        if r["device_type"] == "infrastructure":
+            rule_label, llm_label = "infrastructure", "—"
+        else:
+            rule_label = rules.classify(prof)["label"]
+            cached = llm.get_cached(prof) if llm is not None else None
+            llm_label = f"{cached['label']} ({cached['confidence']:.2f})" if cached else "—"
         out.append({
             "mac": r["mac"],
             "ip": r["ip"] or "—",
             "hostname": r["hostname"] or "—",
             "oui": r["vendor"] or r["mac"][:8],
-            "device_type": r["device_type"] or "—",
+            "rule_type": rule_label,
+            "llm_type": llm_label,
             "status": r["status"],
             "ports": ", ".join(port_list) or "—",
             "mdns": ", ".join(mdns_list) or "—",

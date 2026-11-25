@@ -10,5 +10,6 @@ inventory.yaml
 experiments/results.csv
 .DS_Store
 data/*.log
+data/llm_cache.json
 .obsidian/
 .trash/

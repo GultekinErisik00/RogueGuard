@@ -8,7 +8,7 @@ Genel kurallar ve mimari detaylar için `AGENTS.md`, oturum geçmişi için `PRO
 ## 1. Repo ve Ortam Durumu
 
 - **GitHub Remote:** `https://github.com/GultekinErisik00/RogueGuard.git` (dal: `main`)
-- **Test Durumu:** VM'de `54 passed` (`.venv/bin/python -m pytest -q`)
+- **Test Durumu:** VM'de `61 passed` (`.venv/bin/python -m pytest -q`)
 - **VM (`rogueguard-lab`):** Ubuntu 26.10 arm64, `ssh rogue` (`192.168.23.136`), şifresiz sudo aktif (`SUDO_OK`).
 - **Çalışan Container'lar:** `rg-router`, `mqtt-broker`, `cam-01`, `cam-02`, `printer-01`, `plug-01`, `temp-01`, `thermo-01` (hepsi `clean` snapshot'lı).
 - **VM Askı Notu:** Son kontrolde `rg-router` `eth0` (incusbr0) IPv4'ü düşmüştü. İnternet gereken ilk adımda (Wazuh/Groq) VM'de şu komutu çalıştır:
@@ -30,17 +30,13 @@ Genel kurallar ve mimari detaylar için `AGENTS.md`, oturum geçmişi için `PRO
 | **6.4 Karantina** | ✅ Bitti | `quarantine.py` (`br-quar`), `router.py` (`rg_approved`/`rg_block`), `actions.py` (`contained_at`), `arp_heal.py`. |
 | **6.5 Alarm İletimi** | ✅ Bitti | `rogueguard/alerting/syslog.py` (UDP 514, Wazuh uyumlu syslog formatı + JSON yükü, `wazuh_ip: null` veya erişilemezken hatasız). `protect` `on_alert` zincirine bağlı. |
 | **6.6 Dashboard + Onay** | ✅ Bitti | `rogueguard/containment/approvals.py` (`ApprovalWatcher`), `dashboard/{data,app}.py` (`@st.fragment(run_every="5s")`, `http://192.168.23.136:8501`), `db.py` `_match_dir_owner`. Canlı `approve`/`reject` → `rg_approved`/`rg_block` geçti. |
+| **6.7 Sınıflandırıcı** | ✅ Bitti | `rogueguard/classify/{rules,llm}.py` (`openai/gpt-oss-20b`, parmak izi hash önbelleği, 429 `retry-after`, hibrit) + dashboard tahmini tür sütunu. Canlı Groq 6/6 doğru (0.40–0.71 sn), önbellek doğrulandı. |
 
 ---
 
 ## 3. Tam Kaldığımız Yer → Sıradaki Adımlar
 
-### 1. Sırada: **6.7 Cihaz Türü Sınıflandırma (`rogueguard/classify/`)**
-- `classify/rules.py`: Port, mDNS servisi, OUI üreticisi ve `vendor_class` ile `{camera, printer, smart_plug, sensor, thermostat, unknown}` tahmini.
-- `classify/llm.py`: Groq ücretsiz katman (`https://api.groq.com/openai/v1`, `temperature=0`, JSON `{label, confidence, reason}`, parmak izi hash önbelleği, 429'da `retry-after`). `GROQ_API_KEY` yalnızca `.env` içinde.
-- **Sınır kuralı:** LLM çıktısı **sadece dashboard'da "tahmini tür"** olarak gösterilir, **karar motoruna asla girmez**.
-
-### 3. Sırada: **Adım 4 — Wazuh SIEM (`lab/wazuh/`)**
+### 1. Sırada: **Adım 4 — Wazuh SIEM (`lab/wazuh/`)**
 - `wazuh` Incus container (`images:ubuntu/24.04`, `security.nesting=true`, `limits.memory=5GiB`, `incusbr0` statik IP → `config.yaml` `network.wazuh_ip`, proxy `8443 → 443`).
 - `wazuh-docker` single-node, indexer `OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g`, UDP 514 syslog (`allowed-ips` = `10.160.244.0/24`).
 - `lab/wazuh/local_decoder.xml` (`^rogueguard`, `JSON_Decoder`) ve `lab/wazuh/local_rules.xml` (`100200`–`100205`, `<mitre><id>`).

@@ -115,14 +115,11 @@ Kritik tasarım ilkeleri (kodu değiştirirken bozma):
 
 ## 6. Proje Durumu ve Kalan İşler
 
-### Tamamlananlar (54 pytest testi geçiyor)
+### Tamamlananlar (61 pytest testi geçiyor)
 - [x] **Adım 1–3:** VM, `br-iot`/`br-quar`/`br-svc`, `rg-router`, `mqtt-broker`, 6 meşru cihaz (`clean` snapshot).
-- [x] **Adım 5 & 6.1–6.6 + `full` profil:** SQLite şeması, keşif (`sniffer`, `arp_scan`, `router_tap`, `port_tap`, `recorder`), `learn` + `nmap` + benzerlik testi, karar motoru (`allowlist`/`fingerprint`/`full`), karantina (`br-quar`), `rg_block`, `arp_heal`, syslog alarm iletimi (`alerting/syslog.py`), Streamlit dashboard (`dashboard/`) + daemon `approvals` onay akışı (`containment/approvals.py`).
+- [x] **Adım 5 & 6.1–6.7 + `full` profil:** SQLite şeması, keşif (`sniffer`, `arp_scan`, `router_tap`, `port_tap`, `recorder`), `learn` + `nmap` + benzerlik testi, karar motoru (`allowlist`/`fingerprint`/`full`), karantina (`br-quar`), `rg_block`, `arp_heal`, syslog alarm iletimi (`alerting/syslog.py`), Streamlit dashboard (`dashboard/`) + daemon `approvals` onay akışı (`containment/approvals.py`), kural + Groq LLM cihaz türü sınıflandırma (`classify/{rules,llm}.py`, `openai/gpt-oss-20b`).
 
 ### Sıradaki Adımlar
-- [ ] **6.7 Cihaz türü sınıflandırma (`rogueguard/classify/`):**
-  - `rules.py`: port, mDNS, OUI, vendor_class ile `{camera, printer, smart_plug, sensor, thermostat, unknown}` tahmini.
-  - `llm.py`: Groq OpenAI-uyumlu API (`https://api.groq.com/openai/v1`), `temperature=0`, JSON `{label, confidence, reason}`, parmak izi hash önbelleği, 429'da `retry-after`. Anahtar `.env`'den okunur.
 - [ ] **Adım 4 — Wazuh SIEM:** `wazuh` container (`images:ubuntu/24.04`, `security.nesting=true`, `limits.memory=5GiB`, `incusbr0` statik IP, proxy `8443 → 443`), `wazuh-docker` single-node, UDP 514 syslog, `lab/wazuh/` altında `local_decoder.xml` ve `local_rules.xml` (100200–100205, `<mitre><id>`).
 - [ ] **Adım 7 — Deneyler (`experiments/`):**
   - `run_scenarios.py`: 3 profil (`allowlist`, `fingerprint`, `full`) × 8 senaryo (R1–R4, B1–B4) × 10 tekrar, kaldığı yerden devam edebilmeli, `results.csv`, arpwatch `journalctl` kıyaslaması.

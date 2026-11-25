@@ -69,3 +69,8 @@ containment:
 
 learn:
   inventory_path: inventory.yaml    # repo köküne göre; .gitignore'da (lab'a özel)
+
+classify:
+  llm_base_url: https://api.groq.com/openai/v1
+  llm_model: openai/gpt-oss-20b
+  cache_path: data/llm_cache.json   # parmak izi hash önbelleği (.gitignore'da)
