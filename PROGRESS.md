@@ -124,5 +124,12 @@
 - 50 test geçiyor (`tests/test_alerting.py` 5 yeni: JSON alanları, `wazuh_ip: null` no-op, syslog formatı, yerel UDP soketine DB alarmından gerçek gönderim, soket hatası yutma).
 - **Kontrol (canlı):** `wazuh_ip: null` iken `protect --duration 3` hatasız çalıştı ve temiz kapandı.
 
+### 6.6 Dashboard ve Onay Akışı ✅ (25 Kasım)
+- `rogueguard/containment/approvals.py`: `apply_pending()` + `ApprovalWatcher` arka plan iş parçacığı (`protect` modunda 2 sn'de bir `approvals WHERE applied_at IS NULL` satırlarını işler). `approve` → cihazı `approved` yapar, gözlemlerden eksik parmak izi alanlarını doldurur, IP'yi `rg_approved`'a ekler (varsa `rg_block`'tan çıkarır); `reject` → `blocked` + `rg_block` (varsa `rg_approved`'dan çıkarır); `applied_at` yazar.
+- `dashboard/data.py` + `dashboard/app.py`: Streamlit arayüzü (`@st.fragment(run_every="5s")`), 4 sekme: Onay Bekleyenler (Onayla/Reddet → sadece `approvals` tablosuna yazar), Cihazlar, Alarmlar (ATT&CK + TTC), Deney Sonuçları (`experiments/results.csv`). Erişim: `http://192.168.23.136:8501`.
+- **Karşılaşılan sorun & çözüm:** Daemon `sudo` (root) ile çalıştığı için `data/rogueguard.db` (-wal/-shm) `root:root` sahiplenmişti ve root olmadan çalışan Streamlit `approvals`'a yazarken `readonly database` hatası aldı. `rogueguard/db.py`'ye `_match_dir_owner()` eklendi: root olarak açılan DB/WAL/SHM dosyaları otomatik olarak `data/` klasörünün sahibine (`rogue`) veriliyor.
+- 54 test geçiyor (`tests/test_approvals.py` 4 yeni).
+- **Kontrol (canlı):** Streamlit `http://192.168.23.136:8501/_stcore/health` Mac'ten `ok`; `protect` açıkken root olmadan `submit_approval` → `approve` (`approved` + `rg_approved`) ve `reject` (`blocked` + `rg_block`) canlı doğrulandı (`LIVE_APPROVAL_FLOW_OK`).
+
 ### Sıradaki adım
-6.6 dashboard (Streamlit + onay akışı: `approvals` → daemon), 6.7 sınıflandırıcılar (kural + Groq LLM, `.env` anahtarı); sonra Adım 4 Wazuh ve Adım 7 deney betikleri.
+6.7 sınıflandırıcılar (`rogueguard/classify/rules.py` + `llm.py`, Groq `.env` anahtarı); sonra Adım 4 Wazuh ve Adım 7 deney betikleri.

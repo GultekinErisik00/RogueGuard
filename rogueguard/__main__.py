@@ -48,6 +48,7 @@ def main() -> None:
             router.add(router.approved_set, new_ip)
 
         from rogueguard.alerting.syslog import SyslogForwarder
+        from rogueguard.containment.approvals import ApprovalWatcher
         alert_hooks = []
         if cfg["containment"]["enabled"]:
             from rogueguard.containment.actions import Containment
@@ -65,12 +66,15 @@ def main() -> None:
 
         engine = DecisionEngine(cfg, on_ip_change=move_approved_ip, on_alert=on_alert)
         engine.sweep()
+        approvals = ApprovalWatcher(cfg["database"]["path"], router)
+        approvals.start()
         disc = Discovery(cfg, on_observation=engine.on_observation,
                          on_arp=engine.on_arp, on_syn=engine.on_syn)
         disc.start()
         try:
             disc.run_for(args.duration)
         finally:
+            approvals.stop()
             syslog.close()
     elif args.cmd == "sync":
         from rogueguard import db

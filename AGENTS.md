@@ -115,12 +115,11 @@ Kritik tasarım ilkeleri (kodu değiştirirken bozma):
 
 ## 6. Proje Durumu ve Kalan İşler
 
-### Tamamlananlar (50 pytest testi geçiyor)
+### Tamamlananlar (54 pytest testi geçiyor)
 - [x] **Adım 1–3:** VM, `br-iot`/`br-quar`/`br-svc`, `rg-router`, `mqtt-broker`, 6 meşru cihaz (`clean` snapshot).
-- [x] **Adım 5 & 6.1–6.5 + `full` profil:** SQLite şeması, keşif (`sniffer`, `arp_scan`, `router_tap`, `port_tap`, `recorder`), `learn` + `nmap` + benzerlik testi, karar motoru (`allowlist`/`fingerprint`/`full`), karantina (`br-quar`), `rg_block`, `arp_heal`, syslog alarm iletimi (`alerting/syslog.py`).
+- [x] **Adım 5 & 6.1–6.6 + `full` profil:** SQLite şeması, keşif (`sniffer`, `arp_scan`, `router_tap`, `port_tap`, `recorder`), `learn` + `nmap` + benzerlik testi, karar motoru (`allowlist`/`fingerprint`/`full`), karantina (`br-quar`), `rg_block`, `arp_heal`, syslog alarm iletimi (`alerting/syslog.py`), Streamlit dashboard (`dashboard/`) + daemon `approvals` onay akışı (`containment/approvals.py`).
 
 ### Sıradaki Adımlar
-- [ ] **6.6 Dashboard (`dashboard/` — Streamlit):** Cihazlar, Onay bekleyenler (Onayla/Reddet → `approvals` tablosuna yazar; `protect` daemon'u `approvals` tablosunu periyodik okuyup `approved`/`rg_approved` veya `blocked`/`rg_block` uygular ve `applied_at` yazar), Alarmlar, Deney sonuçları. `@st.fragment(run_every="5s")`, erişim `http://<VM_IP>:8501`.
 - [ ] **6.7 Cihaz türü sınıflandırma (`rogueguard/classify/`):**
   - `rules.py`: port, mDNS, OUI, vendor_class ile `{camera, printer, smart_plug, sensor, thermostat, unknown}` tahmini.
   - `llm.py`: Groq OpenAI-uyumlu API (`https://api.groq.com/openai/v1`), `temperature=0`, JSON `{label, confidence, reason}`, parmak izi hash önbelleği, 429'da `retry-after`. Anahtar `.env`'den okunur.

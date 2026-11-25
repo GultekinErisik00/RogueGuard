@@ -4,6 +4,7 @@ Daemon ve Streamlit aynı dosyayı kullanır. Dashboard sadece `approvals`'a yaz
 daemon onu okuyup kararı uygular; iki süreç arasında başka iletişim katmanı yok.
 """
 import json
+import os
 import sqlite3
 import time
 from pathlib import Path
@@ -71,7 +72,21 @@ def connect(path: str) -> sqlite3.Connection:
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA busy_timeout=5000")
     conn.executescript(SCHEMA)
+    _match_dir_owner(Path(path))
     return conn
+
+
+def _match_dir_owner(db_path: Path) -> None:
+    """Daemon root ile çalışırken oluşan DB/WAL/SHM dosyalarını data/ sahibine (rogue)
+    verir ki root olmadan çalışan Streamlit dashboard `approvals` tablosuna yazabilsin."""
+    if os.geteuid() != 0:
+        return
+    st = db_path.parent.stat()
+    if st.st_uid == 0:
+        return
+    for p in (db_path, Path(f"{db_path}-wal"), Path(f"{db_path}-shm")):
+        if p.exists():
+            os.chown(p, st.st_uid, st.st_gid)
 
 
 def add_observation(conn: sqlite3.Connection, mac: str, ip: str | None,

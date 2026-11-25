@@ -8,7 +8,7 @@ Genel kurallar ve mimari detaylar için `AGENTS.md`, oturum geçmişi için `PRO
 ## 1. Repo ve Ortam Durumu
 
 - **GitHub Remote:** `https://github.com/GultekinErisik00/RogueGuard.git` (dal: `main`)
-- **Test Durumu:** VM'de `50 passed` (`.venv/bin/python -m pytest -q`)
+- **Test Durumu:** VM'de `54 passed` (`.venv/bin/python -m pytest -q`)
 - **VM (`rogueguard-lab`):** Ubuntu 26.10 arm64, `ssh rogue` (`192.168.23.136`), şifresiz sudo aktif (`SUDO_OK`).
 - **Çalışan Container'lar:** `rg-router`, `mqtt-broker`, `cam-01`, `cam-02`, `printer-01`, `plug-01`, `temp-01`, `thermo-01` (hepsi `clean` snapshot'lı).
 - **VM Askı Notu:** Son kontrolde `rg-router` `eth0` (incusbr0) IPv4'ü düşmüştü. İnternet gereken ilk adımda (Wazuh/Groq) VM'de şu komutu çalıştır:
@@ -29,23 +29,13 @@ Genel kurallar ve mimari detaylar için `AGENTS.md`, oturum geçmişi için `PRO
 | **6.3 Karar Motoru** | ✅ Bitti | `DecisionEngine` (`allowlist` / `fingerprint` / `full`), MITRE ATT&CK Enterprise eşlemesi (`attack_map.py`), `arp_guard.py`, `scan.py`, `behavior.py`. Canlı B1/R1/tarama/ARP zehirleme geçti. |
 | **6.4 Karantina** | ✅ Bitti | `quarantine.py` (`br-quar`), `router.py` (`rg_approved`/`rg_block`), `actions.py` (`contained_at`), `arp_heal.py`. |
 | **6.5 Alarm İletimi** | ✅ Bitti | `rogueguard/alerting/syslog.py` (UDP 514, Wazuh uyumlu syslog formatı + JSON yükü, `wazuh_ip: null` veya erişilemezken hatasız). `protect` `on_alert` zincirine bağlı. |
+| **6.6 Dashboard + Onay** | ✅ Bitti | `rogueguard/containment/approvals.py` (`ApprovalWatcher`), `dashboard/{data,app}.py` (`@st.fragment(run_every="5s")`, `http://192.168.23.136:8501`), `db.py` `_match_dir_owner`. Canlı `approve`/`reject` → `rg_approved`/`rg_block` geçti. |
 
 ---
 
 ## 3. Tam Kaldığımız Yer → Sıradaki Adımlar
 
-### 1. Sırada: **6.6 Streamlit Dashboard + Onay Akışı (`dashboard/`)**
-- **Daemon tarafı:** `protect` çalışırken `approvals` tablosundaki `applied_at IS NULL` kayıtlarını periyodik (ör. 2 sn) okuyup uygula:
-  - `approve` → `devices.status = 'approved'`, cihazın IP'si varsa `rg_approved`'a ekle (ve varsa `rg_block`'tan çıkar), `approvals.applied_at` yaz.
-  - `reject` → `devices.status = 'blocked'`, IP varsa `rg_block`'a ekle (ve `rg_approved`'dan çıkar), `approvals.applied_at` yaz.
-  - İlgili birim testlerini ekle (`tests/test_approvals.py` vb.).
-- **Dashboard (`dashboard/app.py`):**
-  - SQLite (`data/rogueguard.db`) okur, sadece `approvals` tablosuna yazar.
-  - Sekmeler/bölümler: **Cihazlar** (envanter + durum + kural/LLM tahmini türü için alan), **Onay Bekleyenler** (`pending` cihazlar için **Onayla** / **Reddet** butonları → `approvals` satırı ekler), **Alarmlar** (ATT&CK tekniği, önem, aksiyon, TTD/TTC), **Deney Sonuçları** (`experiments/results.csv` varsa tablo/özet).
-  - `@st.fragment(run_every="5s")` ile canlı yenileme; VM'de `streamlit run dashboard/app.py --server.address 0.0.0.0 --server.port 8501` (`http://192.168.23.136:8501`).
-- **Kontrol:** `protect` + dashboard çalışırken yeni bir cihaz bağla → `pending` görünür → Onayla'ya bas → `approved` + `rg_approved` olur; Reddet'e bas → `blocked` + `rg_block` olur.
-
-### 2. Sırada: **6.7 Cihaz Türü Sınıflandırma (`rogueguard/classify/`)**
+### 1. Sırada: **6.7 Cihaz Türü Sınıflandırma (`rogueguard/classify/`)**
 - `classify/rules.py`: Port, mDNS servisi, OUI üreticisi ve `vendor_class` ile `{camera, printer, smart_plug, sensor, thermostat, unknown}` tahmini.
 - `classify/llm.py`: Groq ücretsiz katman (`https://api.groq.com/openai/v1`, `temperature=0`, JSON `{label, confidence, reason}`, parmak izi hash önbelleği, 429'da `retry-after`). `GROQ_API_KEY` yalnızca `.env` içinde.
 - **Sınır kuralı:** LLM çıktısı **sadece dashboard'da "tahmini tür"** olarak gösterilir, **karar motoruna asla girmez**.
