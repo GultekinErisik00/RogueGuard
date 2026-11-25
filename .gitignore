@@ -13,3 +13,4 @@ data/*.log
 data/llm_cache.json
 .obsidian/
 .trash/
+handoff.md
