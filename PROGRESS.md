@@ -139,5 +139,18 @@
 - **Kontrol (canlı, Groq `openai/gpt-oss-20b`):** 6 meşru cihazda kurallar 6/6, LLM 6/6 doğru etiketledi (gecikme 0.40–0.71 sn), ikinci sorguda önbellek isabeti doğrulandı (`LIVE_GROQ_AND_CACHE_OK`).
 - Not: Groq konsolunda yeni hesaplarda modeller hem organizasyon (`settings/limits`) hem proje (`settings/project/limits`) seviyesinde ayrı ayrı etkinleştirilmek zorunda.
 
+### Adım 4 — Wazuh SIEM ✅ (25–26 Kasım)
+- `wazuh` Incus container'ı (`images:ubuntu/24.04`, `security.nesting=true`, `limits.memory=5GiB`), statik IP **`10.160.244.10`** (`incusbr0`), proxy device `dash` (`tcp:0.0.0.0:8443 → tcp:127.0.0.1:443`). `config.yaml` `network.wazuh_ip: 10.160.244.10` olarak güncellendi.
+- Container içinde `docker.io` (29.1.3) + `docker-compose-v2` + `wazuh/wazuh-docker` **`v4.14.11`** single-node (`OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g`, 514/udp yayınlı).
+- `lab/wazuh/`: `local_decoder.xml` (`^rogueguard` + `JSON_Decoder`), `local_rules.xml` (`100200` taban, `100201`–`100205` her tespit türü + `<mitre><id>`), `setup_wazuh.sh` (`<remote>` UDP 514 syslog bloğu, `memlock` rlimit düzeltmesi, sertifika + decoder/rule yükleme).
+- **Karşılaşılan sorunlar & çözümler:**
+  - `incus launch` pipe stdin açıkken YAML bekleyip asılı kaldı → `< /dev/null` veya `ssh -n` ile çalıştırılmalı.
+  - Unprivileged Incus container içinde Docker `ulimits.memlock: -1` (`rlimit type 8: operation not permitted`) hatası verdi → `docker-compose.yml` içinden `memlock` kaldırılarak `security.privileged=true` açılmadan tüm 3 Wazuh servisi çalıştırıldı.
+- **Kontrol (canlı):**
+  - `wazuh-logtest` 5/5 tespit türünü doğru kural ve MITRE ATT&CK Enterprise ID'siyle eşledi (`100201/T1200`, `100202/T1036`, `100203/T1557.002`, `100204/T1046`, `100205`).
+  - VM host'undan `SyslogForwarder` ile UDP 514 üzerinden gönderilen `impersonation` ve `arp_spoofing` alarmları `alerts.json` ve OpenSearch `wazuh-alerts-*` indeksine doğru kural + MITRE ID ile düştü (`location: 10.160.244.1`).
+  - Mac'ten `https://192.168.23.136:8443` Wazuh Dashboard yanıt verdi (`HTTP/1.1 302 → /app/login`).
+  - Not: Deneylere başlarken bellek boşaltmak için `incus stop wazuh` kullanılacak.
+
 ### Sıradaki adım
-Adım 4 Wazuh SIEM (`wazuh` container + `lab/wazuh/` decoder/rule + syslog canlı testi) ve Adım 7 deney betikleri (`run_scenarios.py`, `metrics.py`, LLM/prompt-injection deneyi).
+Adım 7 deneyler: LLM + prompt injection deneyi (`experiments/`) ve tam ağ senaryoları (`experiments/run_scenarios.py`, `experiments/metrics.py`: 3 profil × 8 senaryo × 10 tekrar + arpwatch kıyası).

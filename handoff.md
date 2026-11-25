@@ -31,18 +31,13 @@ Genel kurallar ve mimari detaylar için `AGENTS.md`, oturum geçmişi için `PRO
 | **6.5 Alarm İletimi** | ✅ Bitti | `rogueguard/alerting/syslog.py` (UDP 514, Wazuh uyumlu syslog formatı + JSON yükü, `wazuh_ip: null` veya erişilemezken hatasız). `protect` `on_alert` zincirine bağlı. |
 | **6.6 Dashboard + Onay** | ✅ Bitti | `rogueguard/containment/approvals.py` (`ApprovalWatcher`), `dashboard/{data,app}.py` (`@st.fragment(run_every="5s")`, `http://192.168.23.136:8501`), `db.py` `_match_dir_owner`. Canlı `approve`/`reject` → `rg_approved`/`rg_block` geçti. |
 | **6.7 Sınıflandırıcı** | ✅ Bitti | `rogueguard/classify/{rules,llm}.py` (`openai/gpt-oss-20b`, parmak izi hash önbelleği, 429 `retry-after`, hibrit) + dashboard tahmini tür sütunu. Canlı Groq 6/6 doğru (0.40–0.71 sn), önbellek doğrulandı. |
+| **Adım 4 — Wazuh SIEM** | ✅ Bitti | `wazuh` container (`10.160.244.10`, `wazuh-docker v4.14.11`, unprivileged, 5 GiB RAM, `https://192.168.23.136:8443`), `lab/wazuh/{local_decoder.xml,local_rules.xml,setup_wazuh.sh}`. 5/5 `wazuh-logtest` + canlı UDP 514 → OpenSearch `wazuh-alerts-*` doğrulandı. |
 
 ---
 
 ## 3. Tam Kaldığımız Yer → Sıradaki Adımlar
 
-### 1. Sırada: **Adım 4 — Wazuh SIEM (`lab/wazuh/`)**
-- `wazuh` Incus container (`images:ubuntu/24.04`, `security.nesting=true`, `limits.memory=5GiB`, `incusbr0` statik IP → `config.yaml` `network.wazuh_ip`, proxy `8443 → 443`).
-- `wazuh-docker` single-node, indexer `OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g`, UDP 514 syslog (`allowed-ips` = `10.160.244.0/24`).
-- `lab/wazuh/local_decoder.xml` (`^rogueguard`, `JSON_Decoder`) ve `lab/wazuh/local_rules.xml` (`100200`–`100205`, `<mitre><id>`).
-- **Kontrol:** `logger -n <WAZUH_IP> -P 514 -d -t rogueguard '{"type":"arp_spoofing",...}'` → dashboard'da kural ve `T1557.002`.
-
-### 4. Sırada: **Adım 7 — Deneyler (`experiments/`)**
+### 1. Sırada: **Adım 7 — Deneyler (`experiments/`)**
 - `experiments/run_scenarios.py`: 3 profil (`allowlist`, `fingerprint`, `full`) × 8 senaryo (R1–R4, B1–B4) × 10 tekrar, kaldığı yerden devam edebilmeli, `experiments/results.csv`, `arpwatch@br-iot` `journalctl` kıyaslaması (Wazuh kapalı, `tmux` içinde).
 - `experiments/metrics.py`: Konfigürasyon × senaryo tespit oranı, ortalama/medyan TTD ve TTC, yanlış pozitif, arpwatch sütunu.
 - LLM deneyi: 30–50 etiketli parmak izi JSON'u + kural / LLM / hibrit doğruluk + confusion matrix + gecikme + prompt injection testi.

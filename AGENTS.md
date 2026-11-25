@@ -62,7 +62,7 @@ Tüm adresler `config.yaml` ile tutarlı olmalıdır:
 | `br-quar` (Karantina) | `10.20.1.0/24`, GW `10.20.1.1` (`rg-router` eth2), DHCP `.100–.199` |
 | `br-svc` (Servisler) | `10.20.2.0/24`, GW `10.20.2.1` (`rg-router` eth3), DHCP `.100–.199` |
 | `mqtt-broker` (Mosquitto) | `10.20.2.10:1883`, MAC `00:16:3e:20:02:10` (`br-svc`) |
-| `wazuh` (`incusbr0`) | Adım 4'te belirlenecek (`config.yaml` `network.wazuh_ip`) |
+| `wazuh` (`incusbr0`) | `10.160.244.10`, dashboard `https://192.168.23.136:8443`, syslog UDP `514` (`config.yaml` `network.wazuh_ip`) |
 
 **6 Meşru Cihaz (`lab/devices.yaml` = doğru cevap etiketi):**
 `cam-01` (Axis, alpine/3.22, udhcpc), `cam-02` (Axis, cam-01'in bilinçli ikizi — tek benzerlik istisnası), `printer-01` (Brother, debian/12, dhclient), `plug-01` (Belkin, debian/13, dhcpcd), `temp-01` (Espressif, alpine/3.21, udhcpc + extra opt55), `thermo-01` (ecobee, ubuntu/24.04, systemd-networkd).
@@ -116,11 +116,10 @@ Kritik tasarım ilkeleri (kodu değiştirirken bozma):
 ## 6. Proje Durumu ve Kalan İşler
 
 ### Tamamlananlar (61 pytest testi geçiyor)
-- [x] **Adım 1–3:** VM, `br-iot`/`br-quar`/`br-svc`, `rg-router`, `mqtt-broker`, 6 meşru cihaz (`clean` snapshot).
+- [x] **Adım 1–4:** VM, `br-iot`/`br-quar`/`br-svc`, `rg-router`, `mqtt-broker`, 6 meşru cihaz (`clean` snapshot), Wazuh SIEM (`wazuh` container `10.160.244.10`, `wazuh-docker v4.14.11`, UDP 514 syslog, `lab/wazuh/` decoder/rules `100200`–`100205`, proxy `8443 → 443`).
 - [x] **Adım 5 & 6.1–6.7 + `full` profil:** SQLite şeması, keşif (`sniffer`, `arp_scan`, `router_tap`, `port_tap`, `recorder`), `learn` + `nmap` + benzerlik testi, karar motoru (`allowlist`/`fingerprint`/`full`), karantina (`br-quar`), `rg_block`, `arp_heal`, syslog alarm iletimi (`alerting/syslog.py`), Streamlit dashboard (`dashboard/`) + daemon `approvals` onay akışı (`containment/approvals.py`), kural + Groq LLM cihaz türü sınıflandırma (`classify/{rules,llm}.py`, `openai/gpt-oss-20b`).
 
 ### Sıradaki Adımlar
-- [ ] **Adım 4 — Wazuh SIEM:** `wazuh` container (`images:ubuntu/24.04`, `security.nesting=true`, `limits.memory=5GiB`, `incusbr0` statik IP, proxy `8443 → 443`), `wazuh-docker` single-node, UDP 514 syslog, `lab/wazuh/` altında `local_decoder.xml` ve `local_rules.xml` (100200–100205, `<mitre><id>`).
 - [ ] **Adım 7 — Deneyler (`experiments/`):**
   - `run_scenarios.py`: 3 profil (`allowlist`, `fingerprint`, `full`) × 8 senaryo (R1–R4, B1–B4) × 10 tekrar, kaldığı yerden devam edebilmeli, `results.csv`, arpwatch `journalctl` kıyaslaması.
   - `metrics.py`: tespit oranı, ortalama/medyan TTD ve TTC, yanlış pozitif, arpwatch sütunu.
@@ -134,3 +133,4 @@ Kritik tasarım ilkeleri (kodu değiştirirken bozma):
 - **Incus aynı MAC'i iki container'a vermez:** MAC klonlayan rogue senaryolarında (R2/R3/R4) rogue kendi MAC'iyle başlar, MAC içeriden değiştirilir (`ip link set eth0 down; ip link set eth0 address <MAC>; ip link set eth0 up; networkctl reconfigure eth0`).
 - **Python 3.14 pip:** VM `.venv`'de yeni paket gerekirse tek tek kur (`pip install <paket>`), toplu kurulum takılabiliyor.
 - **`inventory.yaml` sadece VM'dedir** (gitignore'da); benzerlik tablosunu yenilemek için VM'de `.venv/bin/python -m experiments.similarity_table`.
+- **Non-interactive SSH ile `incus launch` stdin bekleyip takılır:** Daima `ssh -n` veya `< /dev/null` kullan.

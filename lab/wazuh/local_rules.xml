@@ -1,0 +1,49 @@
+<!-- RogueGuard MITRE ATT&CK Enterprise kuralları (Adım 4, 100200-100205) -->
+<group name="rogueguard,">
+  <rule id="100200" level="3">
+    <decoded_as>rogueguard</decoded_as>
+    <description>RogueGuard event</description>
+  </rule>
+
+  <rule id="100201" level="8">
+    <if_sid>100200</if_sid>
+    <field name="type">^unknown_device$</field>
+    <description>RogueGuard: unknown device $(mac) $(ip)</description>
+    <mitre>
+      <id>T1200</id>
+    </mitre>
+  </rule>
+
+  <rule id="100202" level="12">
+    <if_sid>100200</if_sid>
+    <field name="type">^impersonation$</field>
+    <description>RogueGuard: impersonation of $(mac)</description>
+    <mitre>
+      <id>T1036</id>
+    </mitre>
+  </rule>
+
+  <rule id="100203" level="12">
+    <if_sid>100200</if_sid>
+    <field name="type">^arp_spoofing$</field>
+    <description>RogueGuard: ARP spoofing from $(mac)</description>
+    <mitre>
+      <id>T1557.002</id>
+    </mitre>
+  </rule>
+
+  <rule id="100204" level="10">
+    <if_sid>100200</if_sid>
+    <field name="type">^abnormal_scan$</field>
+    <description>RogueGuard: scanning from $(mac)</description>
+    <mitre>
+      <id>T1046</id>
+    </mitre>
+  </rule>
+
+  <rule id="100205" level="10">
+    <if_sid>100200</if_sid>
+    <field name="type">^abnormal_behavior$</field>
+    <description>RogueGuard: abnormal behavior $(mac)</description>
+  </rule>
+</group>

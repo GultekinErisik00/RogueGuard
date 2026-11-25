@@ -1,0 +1,5 @@
+<!-- RogueGuard syslog JSON decoder (Adım 4) -->
+<decoder name="rogueguard">
+  <program_name>^rogueguard</program_name>
+  <plugin_decoder>JSON_Decoder</plugin_decoder>
+</decoder>

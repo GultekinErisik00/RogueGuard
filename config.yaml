@@ -15,7 +15,7 @@ network:
   svc_dhcp: [10.20.2.100, 10.20.2.199]
   broker_mac: "00:16:3e:20:02:10"
   broker_ip: 10.20.2.10
-  wazuh_ip: null                # Adım 4'te incusbr0 içinden seçilecek
+  wazuh_ip: 10.160.244.10       # wazuh container (incusbr0)
 
 router:
   container: rg-router
