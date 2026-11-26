@@ -152,5 +152,11 @@
   - Mac'ten `https://192.168.23.136:8443` Wazuh Dashboard yanıt verdi (`HTTP/1.1 302 → /app/login`).
   - Not: Deneylere başlarken bellek boşaltmak için `incus stop wazuh` kullanılacak.
 
+### Adım 7A — LLM + prompt injection deneyi ✅ (26 Kasım)
+- `experiments/llm_dataset.py` (48 etiketli parmak izi: 6 canlı, 30 `devices.yaml` varyantı, 12 lab dışı profil; 21 injection örneği), `experiments/llm_benchmark.py` (kurallar / LLM / hibrit, `--pace`, `--reuse`), `experiments/llm_report.py` (Markdown tablolar). Ham sonuç `experiments/llm_results.json`.
+- 67 test geçiyor (`tests/test_llm_benchmark.py` 6 yeni).
+- **Sonuç (Groq `openai/gpt-oss-20b`, 65 çağrı):** doğruluk kurallar %94, LLM %81, hibrit %96; LLM yanıltıcı hostname varyantında 6/6 yanlış (port/mDNS'i yok saydı); açık talimat enjeksiyonu LLM'de 0/21, kurallarda 2/21 (anahtar kelime). LLM medyan 0.66 sn. Ayrıntı: `notes/LLM Deney Sonuçları.md`.
+- **Karşılaşılan sorun:** VM askıdan dönünce yine `incusbr0` IPv4'ü yoktu → `systemctl restart incus` + `networkctl reconfigure eth0`.
+
 ### Sıradaki adım
-Adım 7 deneyler: LLM + prompt injection deneyi (`experiments/`) ve tam ağ senaryoları (`experiments/run_scenarios.py`, `experiments/metrics.py`: 3 profil × 8 senaryo × 10 tekrar + arpwatch kıyası).
+Adım 7B tam ağ senaryoları (`experiments/run_scenarios.py`, `experiments/metrics.py`: 3 profil × 8 senaryo × 10 tekrar + arpwatch kıyası).
