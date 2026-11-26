@@ -19,6 +19,9 @@ def main() -> None:
     l.add_argument("--duration", type=float, required=True, help="dinleme süresi (saniye)")
     p = sub.add_parser("protect", help="keşfi çalıştır, karar motoruyla alarm üret")
     p.add_argument("--duration", type=float, default=None, help="saniye (boş = Ctrl+C'ye kadar)")
+    p.add_argument("--profile", choices=("allowlist", "fingerprint", "full"), default=None,
+                   help="config.yaml'daki detection_profile yerine (deneyler için)")
+    p.add_argument("--db", default=None, help="config.yaml'daki veritabanı yerine (deneyler için)")
     sub.add_parser("sync", help="router setlerini veritabanındaki duruma eşitle")
     args = ap.parse_args()
 
@@ -35,6 +38,10 @@ def main() -> None:
         from rogueguard.learn import learn
         learn(cfg, args.duration)
     elif args.cmd == "protect":
+        cfg = config.with_overrides(cfg, args.profile, args.db)
+        logging.getLogger("rogueguard").info("protect: profil=%s db=%s",
+                                             cfg["decision"]["detection_profile"],
+                                             cfg["database"]["path"])
         from rogueguard import db
         from rogueguard.containment.router import Router
         from rogueguard.decision.engine import DecisionEngine
