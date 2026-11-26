@@ -68,7 +68,7 @@ def render(data: dict[str, Any]) -> str:
     out = [f"Model: `{data['model']}` · Koşu: {data['generated_at']}", "",
            "### Doğruluk", *accuracy_table(s, counts), "",
            f"API çağrısı (etiketli set): kurallar {calls['rules']}, LLM {calls['llm']}, "
-           f"hibrit {calls['hybrid']}. LLM gecikmesi: ort. {lat['mean_s']} sn, "
+           f"hibrit {calls['hybrid']}. LLM gecikmesi (injection dahil tüm çağrılar): ort. {lat['mean_s']} sn, "
            f"medyan {lat['median_s']} sn, en çok {lat['max_s']} sn.", "",
            "### Hatalı tahminler", *errors_table(data["labeled"]), ""]
     for m in METHODS:
