@@ -141,18 +141,27 @@ def rogue_arpspoof(target_ip: str, gateway_ip: str) -> None:
 
 # --- Router (dnsmasq, nftables) --------------------------------------------------------
 
+def lease_cleanup(leases: str, macs: list[str], ips: list[str] = ()) -> str:
+    """Kira dosyasından verilen MAC'lerin ve IP'lerin satırlarını silen kabuk komutu.
+    IP de silinir çünkü eski bir rogue kirası rezerve edilen adresi tutuyorsa dnsmasq
+    rezervasyonu uygulamaz ("not using configured address ... leased to ...")."""
+    if any(not k for k in [*macs, *ips]):
+        raise ValueError("boş MAC/IP: sed '//d' tüm kira dosyasını hedefler")
+    patterns = [m.lower() for m in macs] + [" " + ip.replace(".", r"\.") + " " for ip in ips]
+    return " && ".join(f"sed -i '/{p}/d' {leases}" for p in patterns) or "true"
+
+
 def dnsmasq_reserve(router: str, mac: str, ip: str) -> None:
     """Cihaza farklı bir IP rezerve eder (B2: meşru IP değişimi)."""
+    deletes = lease_cleanup(LEASES, [mac], [ip])
     incus_exec(router, f"echo 'dhcp-host={mac},{ip}' > {RESERVATION} && "
-                       f"systemctl stop dnsmasq && sed -i '/{mac}/d' {LEASES} && "
-                       "systemctl start dnsmasq")
+                       f"systemctl stop dnsmasq && {deletes} && systemctl start dnsmasq")
 
 
 def dnsmasq_clear(router: str, macs: list[str]) -> None:
     """Rezervasyonu ve verilen MAC'lerin kiralarını siler (cihaz eski adresine dönebilsin)."""
-    deletes = " && ".join(f"sed -i '/{m}/d' {LEASES}" for m in macs) or "true"
-    incus_exec(router, f"rm -f {RESERVATION} && systemctl stop dnsmasq && {deletes} && "
-                       "systemctl start dnsmasq")
+    incus_exec(router, f"rm -f {RESERVATION} && systemctl stop dnsmasq && "
+                       f"{lease_cleanup(LEASES, macs)} && systemctl start dnsmasq")
 
 
 def has_reservation(router: str) -> bool:

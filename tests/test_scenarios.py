@@ -106,3 +106,19 @@ def test_with_overrides_changes_copy_only():
     assert out["database"]["path"].endswith("data/experiments/run.db")
     assert cfg["decision"]["detection_profile"] == config.load()["decision"]["detection_profile"]
     assert config.with_overrides(cfg) == cfg
+
+
+def test_reservation_drops_stale_lease_holding_the_reserved_ip(tmp_path):
+    # Eski bir rogue kirası rezerve edilen IP'yi tutuyorsa dnsmasq rezervasyonu uygulamaz
+    # ("not using configured address"); betik hem kurbanın hem o IP'nin kirasını silmeli.
+    import subprocess
+    from experiments import lab_ops
+    leases = tmp_path / "leases"
+    leases.write_text("1 44:61:32:21:f0:5d 10.20.0.169 ecobee *\n"
+                      "2 10:66:6a:eb:cb:3d 10.20.0.194 * *\n"
+                      "3 10:66:6a:eb:cb:3e 10.20.0.19 * *\n"
+                      "4 00:40:8c:3a:51:b2 10.20.0.111 axis *\n")
+    script = lab_ops.lease_cleanup(str(leases), ["44:61:32:21:f0:5d"], ["10.20.0.194"])
+    subprocess.run(["sh", "-c", script], check=True)
+    assert leases.read_text().splitlines() == ["3 10:66:6a:eb:cb:3e 10.20.0.19 * *",
+                                               "4 00:40:8c:3a:51:b2 10.20.0.111 axis *"]
