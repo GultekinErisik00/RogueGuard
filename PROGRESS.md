@@ -158,13 +158,16 @@
 - **Sonuç (Groq `openai/gpt-oss-20b`, 65 çağrı):** doğruluk kurallar %94, LLM %81, hibrit %96; LLM yanıltıcı hostname varyantında 6/6 yanlış (port/mDNS'i yok saydı); açık talimat enjeksiyonu LLM'de 0/21, kurallarda 2/21 (anahtar kelime). LLM medyan 0.66 sn. Ayrıntı: `notes/LLM Deney Sonuçları.md`.
 - **Karşılaşılan sorun:** VM askıdan dönünce yine `incusbr0` IPv4'ü yoktu → `systemctl restart incus` + `networkctl reconfigure eth0`.
 
-### Adım 7B — Ağ deneyleri altyapısı ✅, tam matris ⏳ (26 Kasım)
+### Adım 7B — Ağ deneyleri ✅ (26–28 Kasım)
 - `lab/build_rogue.sh`: `rg-rogue` (Fedora 43 + nmap + dsniff + ajan), açılışta ağ kapalı, snapshot `clean`. VM'de kurulu.
 - `experiments/lab_ops.py` (incus/dnsmasq/nft/arpwatch/daemon), `experiments/scenarios.py` (R1–R4, B1–B4; kurban tekrar numarasına göre cam-01, printer-01, plug-01, temp-01, thermo-01 arasında döner), `experiments/outcome.py` (TTD/TTC, yanlış pozitif, arpwatch), `experiments/run_scenarios.py` (`prepare` + `run`, kaldığı yerden devam), `experiments/metrics.py` (Markdown özet).
 - `protect --profile <p> --db <yol>` eklendi (`config.with_overrides`); deneyler canlı DB'ye dokunmaz, `data/experiments/run.db` kullanır.
 - 75 test geçiyor (`tests/test_scenarios.py` 8 yeni).
 - **Duman testi (`full`, 1 tekrar, B4 yarıda durduruldu):** R1 0.06 sn (arpwatch 9.0 sn); R2/R3/R4 tespit 0.06–0.13 sn, karantina 0.19–0.27 sn; B1, B2 (IP taşındı) ve B3 (onay 2.0 sn) yanlış pozitifsiz. Koşu başına ~1–2 dk → tam matris (240 koşu) ~6 saat.
 - **Karşılaşılan sorunlar:** (1) Rogue kendi MAC'iyle açılınca klon senaryolarında sahte `unknown_device` üretiyordu → rogue imajında eth0 ağ dosyası kaldırıldı, MAC içeriden ayarlanıp DHCP sonra başlatılıyor. (2) arpwatch ~9 sn'de uyarıyor; koşu tespitten 3 sn sonra bitince kaçırıyordu → rogue senaryolarında t0'dan sonra en az 30 sn gözlem. (3) B2 sonrası cihaz yeni IP'de kalıyor → her koşuda run DB'deki IP'ler canlı adreslerle tazeleniyor; deney bitince canlı DB'de cam-01 IP'si `10.20.0.111` olarak güncellendi.
+- **Tam matris (27–28 Kasım gecesi, 240 koşu, ~6 saat, 0 hata):** `fingerprint`/`full` R1–R4'ün 80/80'ini yakaladı (TTD medyan 0.06–0.09 sn, TTC medyan 0.18–0.21 sn); `allowlist` MAC kopyalayan R2–R4'ü 0/30 yakaladı. 240 koşuda yanlış pozitif ve yanlış karantina 0. arpwatch R1'de ~9 sn, MAC kopyasında (fingerprint/full) 0%. R4'te `arp_spoofing` alarmı hiç çıkmadı (rogue DHCP aşamasında karantinaya alınıyor). Ayrıntı: `notes/Ağ Deney Sonuçları.md`.
+- **Karşılaşılan sorun (4):** B2'nin rezerve ettiği IP eski bir rogue kirasında olunca dnsmasq rezervasyonu sessizce yok saydı (`not using configured address`) → 8 B2 koşusunda IP taşınmadı. `lab_ops.lease_cleanup` o IP'nin kirasını da siliyor (testli, 76 test); 8 koşu yeniden koşuldu, B2 30/30 taşındı.
+- **Kontrol:** VM `76 passed`; `results.csv` 240 satır, `error` sütunu boş.
 
 ### Sıradaki adım
-Tam matrisi tmux'ta başlat (Mac şarjda, kapak açık, `caffeinate`), sonra `experiments.metrics` ile rapor notu. Ayrıntı: `handoff.md`.
+Raporun "Deneyler" bölümü (7A + 7B notlarından), final demo hazırlığı (1–5 Aralık; demo için `incus start wazuh`). İsteğe bağlı: R4 için ARP korumasını ayrı gösteren senaryo (rogue kendi MAC'iyle `arpspoof`), 7A injection ablasyonu.

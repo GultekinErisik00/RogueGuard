@@ -17,6 +17,7 @@ Siber Güvenlik dönem projesi: izole lab ağındaki IoT cihazlarını keşfet, 
 - [x] [[ATT&CK Eşlemesi]]
 - [x] [[LLM Planı]]
 - [x] [[LLM Deney Sonuçları]] (7A)
+- [x] [[Ağ Deney Sonuçları]] (7B)
 - [x] [[R1 İlk Ölçümler]] (R2 karantina ölçümü de burada)
 
 ## Rapor için
